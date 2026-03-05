@@ -1,0 +1,26 @@
+{
+  "name": "washup-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phongsakon6630202538/washup-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/phongsakon6630202538/washup-backend/issues"
+  },
+  "homepage": "https://github.com/phongsakon6630202538/washup-backend#readme",
+  "dependencies": {
+    "express": "^5.2.1",
+    "mongodb": "^7.1.0",
+    "mongoose": "^9.2.4"
+  }
+}
