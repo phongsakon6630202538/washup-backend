@@ -1,18 +1,31 @@
-// ลบโค้ดซ้ำออก แล้วรวมทุกอย่างมาไว้ที่นี่ที่เดียว
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. โหลด Navbar
-  fetch("components/navbar.html")
-    .then((res) => res.text())
-    .then((data) => {
-      const navPlaceholder = document.getElementById("navbar-placeholder");
-      if (navPlaceholder) {
-        navPlaceholder.innerHTML = data;
-        checkLoginStatus(); // เรียกทำงานหลังจากแปะ Navbar เสร็จ
-        setActiveMenu();
-      }
-    });
+  // 1. โหลด Navbar (แยกระหว่างลูกค้า กับ พนักงาน)
+  const navPlaceholder = document.getElementById("navbar-placeholder");
+  const navStaffPlaceholder = document.getElementById(
+    "navbar-staff-placeholder",
+  );
 
-  // 2. โหลด Footer
+  if (navPlaceholder) {
+    // 🟢 ถ้าเป็นหน้าลูกค้า ให้ดึงเมนูลูกค้ามาแปะ
+    fetch("components/navbar.html")
+      .then((res) => res.text())
+      .then((data) => {
+        navPlaceholder.innerHTML = data;
+        checkLoginStatus();
+        setActiveMenu();
+      });
+  } else if (navStaffPlaceholder) {
+    // 🔵 ถ้าเป็นหน้าพนักงาน ให้ดึงเมนูพนักงานมาแปะ
+    fetch("components/navbar-staff.html")
+      .then((res) => res.text())
+      .then((data) => {
+        navStaffPlaceholder.innerHTML = data;
+        checkLoginStatus();
+        setActiveMenu();
+      });
+  }
+
+  // 2. โหลด Footer (ใช้ร่วมกันได้)
   fetch("components/footer.html")
     .then((res) => res.text())
     .then((data) => {
@@ -41,34 +54,49 @@ document.addEventListener("DOMContentLoaded", () => {
 // --- ฟังก์ชันต่างๆ ---
 
 function checkLoginStatus() {
-  const authSection = document.getElementById("nav-auth-section");
   const user = JSON.parse(localStorage.getItem("user")); // ดึงข้อมูล User มาเช็ค
 
-  // แก้ไข: เช็คแค่ว่ามี user ในระบบก็พอ ไม่ต้องเช็ค token แล้ว
-  if (user && authSection) {
-    // เปลี่ยน UI เป็นปุ่มสีแดง และปุ่ม Logout
-    authSection.innerHTML = `
-      <a href="profile.html" class="btn-user-badge">${user.login_name}</a>
-      <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>
-    `;
+  if (user) {
+    // เช็คว่ามีกล่อง Auth ของฝั่งลูกค้าไหม (nav-auth-section)
+    const authSectionCustomer = document.getElementById("nav-auth-section");
+    if (authSectionCustomer) {
+      authSectionCustomer.innerHTML = `
+        <a href="profile.html" class="btn-user-badge">${user.login_name}</a>
+        <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>
+      `;
+    }
+
+    // เช็คว่ามีกล่อง Auth ของฝั่งพนักงานไหม (nav-auth-section-staff)
+    const authSectionStaff = document.getElementById("nav-auth-section-staff");
+    if (authSectionStaff) {
+      authSectionStaff.innerHTML = `
+        <span class="btn-user-badge">STAFF: ${user.login_name}</span>
+        <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>
+      `;
+    }
   }
 }
 
 function logoutUser() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
-  window.location.href = "index.html"; // เด้งกลับหน้าแรก
+  window.location.href = "index.html"; // ไม่ว่าใคร Logout ก็เด้งกลับหน้า Landing Page ลูกค้า
 }
 
 function setActiveMenu() {
   const currentPath = window.location.pathname;
+
+  // ไฮไลท์เมนูฝั่งลูกค้า
   if (currentPath.includes("index.html") || currentPath === "/") {
     const home = document.getElementById("nav-home");
     if (home) home.classList.add("active");
   } else if (currentPath.includes("booking")) {
     const booking = document.getElementById("nav-booking");
     if (booking) booking.classList.add("active");
-  } else if (currentPath.includes("history")) {
+  } else if (
+    currentPath.includes("history") &&
+    !currentPath.includes("staff")
+  ) {
     const history = document.getElementById("nav-history");
     if (history) history.classList.add("active");
   }

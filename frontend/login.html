@@ -231,11 +231,14 @@
 
             if (response.ok) {
               alert("เข้าสู่ระบบสำเร็จ!");
-              // เก็บข้อมูล User เบื้องต้นไว้ใน localStorage เพื่อใช้ในหน้าอื่นๆ
               localStorage.setItem("user", JSON.stringify(data.user));
 
-              // เปลี่ยนหน้าไปยังหน้าหลัก (แก้ไขชื่อไฟล์ตามที่คุณมี เช่น index.html)
-              window.location.href = "index.html";
+              // 🚦 จุดแยกทาง (ชี้เป้าให้ไปคนละหน้า)
+              if (data.user.user_role === "staff") {
+                window.location.href = "staff-dashboard.html"; // พนักงานพุ่งไปหน้ากระดาน
+              } else {
+                window.location.href = "index.html"; // ลูกค้าไปหน้า Landing Page ปกติ
+              }
             } else {
               // แสดงข้อความ Error เช่น "user not found" หรือ "wrong password"
               alert(data.message);
