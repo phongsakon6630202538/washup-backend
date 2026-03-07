@@ -306,26 +306,30 @@ app.get("/vehicles/user", authMiddleware, async (req, res) => {
 
 // API สำหรับแก้ไขข้อมูลรถ
 app.put("/vehicles/:id", authMiddleware, async (req, res) => {
+
   const db = mongoose.connection.collection("vehicles");
 
   try {
+
     // รับ vehicle_id จาก URL
     const vehicleId = parseInt(req.params.id);
 
     // รับข้อมูลใหม่จาก body
-    const { vehicle_type_id, license_plate, brand, model, color, note } =
-      req.body;
+    const { vehicle_type_id, license_plate, brand, model, color, note } = req.body;
 
     // ตรวจว่ามีข้อมูลส่งมาหรือไม่
     if (!vehicle_type_id || !license_plate || !brand || !model || !color) {
-      return res
-        .status(400)
-        .json({ message: "please fill all fields except note" });
+      return res.status(400).json({ 
+        message: "please fill all fields except note" 
+      });
     }
 
-    // อัปเดตข้อมูลรถ
+    // อัปเดตข้อมูลรถ (แก้ได้เฉพาะรถของ user ที่ login)
     const result = await db.updateOne(
-      { vehicle_id: vehicleId },
+      { 
+        vehicle_id: vehicleId,
+        user_id: req.user.user_id
+      },
       {
         $set: {
           vehicle_type_id: parseInt(vehicle_type_id),
@@ -333,26 +337,67 @@ app.put("/vehicles/:id", authMiddleware, async (req, res) => {
           brand: brand,
           model: model,
           color: color,
-          note: note,
-        },
-      },
+          note: note
+        }
+      }
     );
 
-    // ถ้าไม่พบรถ
+    // ถ้าไม่พบรถ หรือไม่ใช่เจ้าของรถ
     if (result.matchedCount === 0) {
       return res.status(404).json({
-        message: "vehicle not found",
+        message: "vehicle not found or not your vehicle"
       });
     }
-    //ส่งผลลับกลับไปให้ frontend
+
+    // ส่งผลกลับไป
     res.json({
-      message: "vehicle updated successfully",
+      message: "vehicle updated successfully"
     });
+
   } catch (error) {
+
     res.status(500).json({
-      message: "server error",
+      message: "server error"
     });
   }
+});
+
+// API สำหรับลบรถ
+app.delete("/vehicles/:id", authMiddleware, async (req, res) => {
+
+  const db = mongoose.connection.collection("vehicles");
+
+  try {
+
+    // รับ vehicle_id จาก URL
+    const vehicleId = parseInt(req.params.id);
+
+    // ลบเฉพาะรถของ user ที่ login
+    const result = await db.deleteOne({
+      vehicle_id: vehicleId,
+      user_id: req.user.user_id
+    });
+
+    // ถ้าไม่พบรถ
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        message: "vehicle not found or not your vehicle"
+      });
+    }
+
+    // ส่งผลลัพธ์กลับ
+    res.json({
+      message: "vehicle deleted successfully"
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "server error"
+    });
+
+  }
+
 });
 
 const PORT = process.env.PORT || 3000;
