@@ -162,7 +162,7 @@
             // ฟังก์ชัน Logout
             document.getElementById('logoutBtn').addEventListener('click', (e) => {
                 e.preventDefault();
-                if(confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
+                if(confirm('คุณต้องการออกจากระบบใช่หรือไม่??')) {
                     localStorage.removeItem('user');
                     localStorage.removeItem('token'); // <-- เพิ่มบรรทัดนี้ เพื่อลบ Token ออกตอนกดออกจากระบบ
                     location.reload();
