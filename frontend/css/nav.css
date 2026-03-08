@@ -1,0 +1,90 @@
+/* Navbar Container */
+.navbar-container {
+  display: flex;
+  align-items: center;
+  padding: 15px 10%; /* ปรับให้ขอบซ้ายขวากว้างขึ้นตรงตาม Design */
+  background-color: #ffffff;
+  border-bottom: 2px solid #f0f0f0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* 🎯 จุดสำคัญ: ดันโลโก้ไปซ้ายสุด และผลักเมนูที่เหลือไปขวาสุด */
+.nav-logo {
+  margin-right: auto;
+}
+
+/* Links (กลุ่มเมนูตรงกลางที่ถูกผลักมาขวา) */
+.nav-links {
+  display: flex;
+  gap: 40px; /* ระยะห่างระหว่าง หน้าแรก | จองบริการ | ประวัติ */
+  margin-right: 40px; /* ระยะห่างก่อนถึงปุ่ม USERNAME / LOGIN */
+}
+
+/* 🎯 จุดสำคัญ: สถานะปกติ (Font บาง / Light) */
+.nav-item {
+  text-decoration: none;
+  color: #555; /* สีเทาเข้มให้อ่านง่าย */
+  font-weight: 300; /* น้ำหนักฟอนต์แบบ Light */
+  font-size: 16px;
+  padding-bottom: 5px;
+  transition: all 0.3s;
+}
+
+.nav-item:hover {
+  color: #d71920;
+}
+
+/* 🎯 จุดสำคัญ: สถานะเมื่อกดอยู่หน้านั้น (Font หนา / Bold) */
+.nav-item.active {
+  color: #000; /* สีดำเข้ม */
+  font-weight: 600; /* น้ำหนักฟอนต์แบบ Semi-Bold */
+  border-bottom: 3px solid #e60000; /* ขีดล่างสีแดง */
+}
+
+/* Auth Section (กลุ่มปุ่มขวามือสุด) */
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* ปุ่ม LOGIN/REGISTER สีแดง (ก่อนเข้าสู่ระบบ) */
+.auth-link-red {
+  text-decoration: none;
+  color: #e60000;
+  font-weight: 600;
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+/* กล่อง USERNAME สีแดง (หลังเข้าสู่ระบบ) */
+.btn-user-badge {
+  background-color: #e60000;
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 8px; /* ขอบมนนิดๆ ตาม Design */
+  text-decoration: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+/* ปุ่ม LOGOUT สีเทา */
+.btn-logout {
+  color: #999;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  border: none;
+  background: none;
+  text-transform: uppercase;
+}
+
+.btn-logout:hover {
+  color: #666;
+}
