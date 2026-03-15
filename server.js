@@ -109,11 +109,17 @@ app.post("/users/login", async (req, res) => {
       return res.status(400).json({ message: "wrong password" });
     }
 
-    // สร้าง token
-    const token = jwt.sign({ user_id: user.user_id }, SECRET, {
-      expiresIn: "1h",
-    });
-
+// สร้าง token และเก็บ role ไว้ด้วย
+    const token = jwt.sign(
+    {
+    user_id: user.user_id,
+    user_role: user.user_role
+    },
+    SECRET,
+    {
+    expiresIn: "1h",
+    }
+ );
     // login สำเร็จ
     res.json({
       message: "login success",
@@ -131,7 +137,7 @@ app.post("/users/login", async (req, res) => {
 });
 
 function authMiddleware(req, res, next) {
-  const token = req.headers.authorization; // รับ token จาก header
+  const token = req.headers.authorization?.split(" ")[1]; // รับ token จาก header
 
   if (!token) {
     return res.status(401).json({ message: "no token" });
@@ -306,26 +312,30 @@ app.get("/vehicles/user", authMiddleware, async (req, res) => {
 
 // API สำหรับแก้ไขข้อมูลรถ
 app.put("/vehicles/:id", authMiddleware, async (req, res) => {
+
   const db = mongoose.connection.collection("vehicles");
 
   try {
+
     // รับ vehicle_id จาก URL
     const vehicleId = parseInt(req.params.id);
 
     // รับข้อมูลใหม่จาก body
-    const { vehicle_type_id, license_plate, brand, model, color, note } =
-      req.body;
+    const { vehicle_type_id, license_plate, brand, model, color, note } = req.body;
 
     // ตรวจว่ามีข้อมูลส่งมาหรือไม่
     if (!vehicle_type_id || !license_plate || !brand || !model || !color) {
-      return res
-        .status(400)
-        .json({ message: "please fill all fields except note" });
+      return res.status(400).json({ 
+        message: "please fill all fields except note" 
+      });
     }
 
-    // อัปเดตข้อมูลรถ
+    // อัปเดตข้อมูลรถ (แก้ได้เฉพาะรถของ user ที่ login)
     const result = await db.updateOne(
-      { vehicle_id: vehicleId },
+      { 
+        vehicle_id: vehicleId,
+        user_id: req.user.user_id
+      },
       {
         $set: {
           vehicle_type_id: parseInt(vehicle_type_id),
@@ -333,26 +343,830 @@ app.put("/vehicles/:id", authMiddleware, async (req, res) => {
           brand: brand,
           model: model,
           color: color,
-          note: note,
-        },
-      },
+          note: note
+        }
+      }
     );
 
-    // ถ้าไม่พบรถ
+    // ถ้าไม่พบรถ หรือไม่ใช่เจ้าของรถ
     if (result.matchedCount === 0) {
       return res.status(404).json({
-        message: "vehicle not found",
+        message: "vehicle not found or not your vehicle"
       });
     }
-    //ส่งผลลับกลับไปให้ frontend
+
+    // ส่งผลกลับไป
     res.json({
-      message: "vehicle updated successfully",
+      message: "vehicle updated successfully"
     });
+
   } catch (error) {
+
     res.status(500).json({
-      message: "server error",
+      message: "server error"
     });
   }
+});
+
+// API สำหรับลบรถ
+app.delete("/vehicles/:id", authMiddleware, async (req, res) => {
+
+  const db = mongoose.connection.collection("vehicles");
+
+  try {
+
+    // รับ vehicle_id จาก URL
+    const vehicleId = parseInt(req.params.id);
+
+    // ลบเฉพาะรถของ user ที่ login
+    const result = await db.deleteOne({
+      vehicle_id: vehicleId,
+      user_id: req.user.user_id
+    });
+
+    // ถ้าไม่พบรถ
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        message: "vehicle not found or not your vehicle"
+      });
+    }
+
+    // ส่งผลลัพธ์กลับ
+    res.json({
+      message: "vehicle deleted successfully"
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "server error"
+    });
+
+  }
+
+});
+
+    //services // API สำหรับดึงข้อมูลประเภทบริการล้างรถทั้งหมด
+app.get("/service", async (req, res) => {
+  const db = mongoose.connection.collection("service");
+  try{
+    const services = await db.find({ is_active: true }).toArray();
+    res.json(services);
+  } catch (error) {
+    res.status(500).json({
+      message: "server error"
+    });
+  }
+});
+
+ //service-prices // API สำหรับดึงข้อมูลราคาบริการล้างรถทั้งหมด
+ app.get("/service-prices", async (req, res) => {
+  const db = mongoose.connection.collection("service_prices");
+  try{
+    const prices  = await db.find({ }).toArray();
+    res.json(prices);
+  }catch (error) {
+  res.status(500).json({
+    message: "server error"
+  });
+ }
+});
+    //API bookings //
+
+// POST /bookings
+// ใช้สร้างการจองใหม่
+
+// POST /bookings
+// สร้าง booking และ booking_services โดยให้ id เพิ่มเอง
+
+app.post("/bookings", authMiddleware, async (req, res) => {
+
+  const bookings = mongoose.connection.collection("bookings");
+  const booking_services = mongoose.connection.collection("booking_services");
+  const vehicles = mongoose.connection.collection("vehicles");
+  const service_prices = mongoose.connection.collection("service_prices");
+
+  try {
+
+    const { vehicle_id, booking_datetime, services } = req.body;
+
+    // -----------------------------
+    // สร้าง booking_id อัตโนมัติ
+    // -----------------------------
+    const lastBooking = await bookings
+      .find({})
+      .sort({ booking_id: -1 })
+      .limit(1)
+      .toArray();
+
+    const booking_id = lastBooking.length > 0 ? lastBooking[0].booking_id + 1 : 4001;
+
+    // -----------------------------
+    // หา vehicle_type
+    // -----------------------------
+    const vehicle = await vehicles.findOne({ vehicle_id: vehicle_id });
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "vehicle not found" });
+    }
+
+    const vehicleTypeId = vehicle.vehicle_type_id;
+
+    // -----------------------------
+    // insert booking
+    // -----------------------------
+    await bookings.insertOne({
+      booking_id: booking_id,
+      user_id: req.user.user_id,
+      vehicle_id: vehicle_id,
+      booking_datetime: new Date(booking_datetime),
+      status: "pending"
+    });
+
+    // -----------------------------
+    // loop services
+    // -----------------------------
+    for (let service_id of services) {
+
+      // หา price จาก service_prices
+      const priceData = await service_prices.findOne({
+        service_id: service_id,
+        vehicle_type_id: vehicleTypeId
+      });
+
+      if (!priceData) {
+        return res.status(404).json({ message: "price not found" });
+      }
+
+      // -----------------------------
+      // สร้าง booking_service_id อัตโนมัติ
+      // -----------------------------
+      const lastService = await booking_services
+        .find({})
+        .sort({ booking_service_id: -1 })
+        .limit(1)
+        .toArray();
+
+      const booking_service_id =
+        lastService.length > 0
+          ? lastService[0].booking_service_id + 1
+          : 7001;
+
+      // insert booking_services
+      await booking_services.insertOne({
+        booking_service_id: booking_service_id,
+        booking_id: booking_id,
+        service_id: service_id,
+        price_at_booking: priceData.price
+      });
+
+    }
+
+    res.json({
+      message: "booking created",
+      booking_id: booking_id
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "error creating booking"
+    });
+
+  }
+
+});
+
+// GET /bookings/user
+// ดึงรายการ booking ทั้งหมดของ user ที่ login อยู่
+// ใช้ aggregate + lookup เพื่อ join vehicles
+
+app.get("/bookings/user", authMiddleware, async (req, res) => {
+
+  const db = mongoose.connection.collection("bookings");
+
+  try {
+
+    // user_id มาจาก token ที่ middleware decode ไว้
+    const userId = req.user.user_id;
+
+    // aggregate query
+    const result = await db.aggregate([
+
+      // 1️⃣ filter booking ของ user คนนี้
+      {
+        $match: {
+          user_id: userId
+        }
+      },
+
+      // 2️⃣ join vehicles collection
+      {
+        $lookup: {
+          from: "vehicles",           // collection ที่จะ join
+          localField: "vehicle_id",   // field ใน bookings
+          foreignField: "vehicle_id", // field ใน vehicles
+          as: "vehicle"
+        }
+      },
+
+      // 3️⃣ แปลง array vehicle ให้เป็น object
+      {
+        $unwind: "$vehicle"
+      },
+
+      // 4️⃣ เรียงตามวันที่จองล่าสุด
+      {
+        $sort: {
+          booking_datetime: -1
+        }
+      },
+
+      // 5️⃣ เลือก field ที่ต้องการส่งกลับ
+      {
+        $project: {
+          _id: 0,
+          booking_id: 1,
+          booking_datetime: 1,
+          status: 1,
+
+          "vehicle.brand": 1,
+          "vehicle.model": 1,
+          "vehicle.license_plate": 1
+        }
+      }
+
+    ]).toArray();
+
+    res.json(result);
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "error fetching bookings"
+    });
+
+  }
+
+});
+
+// GET /bookings/:id
+// ดึงรายละเอียด booking พร้อมข้อมูลรถ และบริการที่เลือก
+
+app.get("/bookings/:id", authMiddleware, async (req, res) => {
+
+  const db = mongoose.connection.collection("bookings");
+
+  try {
+
+    // รับ booking_id จาก URL
+    const bookingId = parseInt(req.params.id);
+
+    const result = await db.aggregate([
+
+      // 1️⃣ หา booking ตาม id
+      {
+        $match: {
+          booking_id: bookingId
+        }
+      },
+
+      // 2️⃣ join vehicles
+      {
+        $lookup: {
+          from: "vehicles",
+          localField: "vehicle_id",
+          foreignField: "vehicle_id",
+          as: "vehicle"
+        }
+      },
+
+      {
+        $unwind: "$vehicle"
+      },
+
+      // 3️⃣ join booking_services
+      {
+        $lookup: {
+          from: "booking_services",
+          localField: "booking_id",
+          foreignField: "booking_id",
+          as: "booking_services"
+        }
+      },
+
+      // 4️⃣ join service เพื่อเอา service_name
+      {
+        $lookup: {
+          from: "service",
+          localField: "booking_services.service_id",
+          foreignField: "service_id",
+          as: "services"
+        }
+      },
+
+      // 5️⃣ format ข้อมูล
+      {
+        $project: {
+          _id: 0,
+          booking_id: 1,
+          status: 1,
+          booking_datetime: 1,
+
+          checkin_note: 1,
+          staff_note: 1,
+          started_at: 1,
+          finished_at: 1,
+
+          vehicle: {
+            brand: "$vehicle.brand",
+            model: "$vehicle.model",
+            license_plate: "$vehicle.license_plate"
+          },
+
+          services: {
+            $map: {
+              input: "$booking_services",
+              as: "bs",
+              in: {
+                service_id: "$$bs.service_id",
+                price: "$$bs.price_at_booking"
+              }
+            }
+          }
+        }
+      }
+    ]).toArray();
+
+    if (result.length === 0) {
+      return res.status(404).json({
+        message: "booking not found"
+      });
+    }
+
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({
+      message: "error fetching booking"
+    });
+  }
+});
+// DELETE /bookings/:id
+// ใช้สำหรับยกเลิก / ลบ booking
+
+app.delete("/bookings/:id", authMiddleware, async (req, res) => {
+
+  // เชื่อมต่อ collectionF ต่าง ๆ
+  const bookings = mongoose.connection.collection("bookings");
+  const booking_services = mongoose.connection.collection("booking_services");
+
+  try {
+
+    // รับ booking_id จาก URL
+    const bookingId = parseInt(req.params.id);
+
+    // -----------------------------F
+    // ตรวจสอบว่ามี booking นี้อยู่ไหม
+    // -----------------------------
+    const booking = await bookings.findOne({
+      booking_id: bookingId
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "booking not found"
+      });
+    }
+
+    // -----------------------------
+    // ลบ booking_services ที่เกี่ยวข้อง
+    // -----------------------------
+    await booking_services.deleteMany({
+      booking_id: bookingId
+    });
+
+    // -----------------------------
+    // ลบ booking หลัก
+    // -----------------------------
+    await bookings.deleteOne({
+      booking_id: bookingId
+    });
+
+    // ส่ง response กลับ
+    res.json({
+      message: "booking deleted",
+      booking_id: bookingId
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "error deleting booking"
+    });
+
+  }
+
+});
+// PUT /bookings/:id
+// ใช้สำหรับพนักงาน update สถานะการล้างรถ
+// เช่น เริ่มล้าง หรือ ล้างเสร็จ
+
+// PUT /bookings/:id
+// ใช้สำหรับพนักงาน update สถานะการล้างรถ
+// เช่น เริ่มล้าง หรือ ล้างเสร็จ
+
+app.put("/bookings/:id", authMiddleware, async (req, res) => {
+
+  // เชื่อมต่อ collection bookings
+  const db = mongoose.connection.collection("bookings");
+
+  try {
+
+    // รับ booking_id จาก URL
+    const bookingId = parseInt(req.params.id);
+
+    // รับข้อมูลจาก frontend
+    const { status, checkin_note, staff_note } = req.body;
+
+    // object สำหรับเก็บ field ที่จะ update
+    let updateData = {};
+
+    // -----------------------------
+    // กรณีพนักงานเริ่มล้างรถ
+    // -----------------------------
+    if (status === "in_progress") {
+
+      updateData.status = "in_progress";  // เปลี่ยนสถานะเป็นกำลังล้าง
+
+      // ถ้ามี note จาก frontend ให้บันทึก
+      if (checkin_note) {
+        updateData.checkin_note = checkin_note;
+      }
+
+      // backend บันทึกเวลาเริ่มล้าง
+      updateData.started_at = new Date();
+
+    }
+
+    // -----------------------------
+    // กรณีพนักงานล้างรถเสร็จ
+    // -----------------------------
+    if (status === "completed") {
+
+      updateData.status = "completed";  // เปลี่ยนสถานะเป็นเสร็จแล้ว
+
+      // ถ้ามี note จากพนักงาน
+      if (staff_note) {
+        updateData.staff_note = staff_note;
+      }
+
+      // backend บันทึกเวลาสิ้นสุด
+      updateData.finished_at = new Date();
+
+    }
+
+    // update booking ใน MongoDB
+    const result = await db.updateOne(
+      { booking_id: bookingId }, // หา booking ตาม id
+      { $set: updateData }       // update เฉพาะ field ที่ต้องการ
+    );
+
+    // ถ้าไม่พบ booking
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "booking not found"
+      });
+    }
+
+    // ส่ง response กลับ
+    res.json({
+      message: "booking updated",
+      booking_id: bookingId
+    });
+
+  } catch (error) {
+
+    // error server
+    res.status(500).json({
+      message: "error updating booking"
+    });
+
+  }
+
+});
+
+// ===============================
+// POST /reviews
+// ใช้สำหรับให้ลูกค้าให้คะแนนหลังล้างรถเสร็จ
+// ===============================
+
+app.post("/reviews", authMiddleware, async (req, res) => {
+
+  // เชื่อมต่อ collection reviews
+  const reviews = mongoose.connection.collection("reviews");
+
+  // เชื่อม collection bookings เพื่อเช็คว่า booking นี้มีอยู่จริงไหม
+  const bookings = mongoose.connection.collection("bookings");
+
+  try {
+
+    // รับข้อมูลจาก frontend
+    const { booking_id, rating, comment } = req.body;
+
+    // -----------------------------
+    // ตรวจสอบว่ามีข้อมูลจำเป็นไหม
+    // -----------------------------
+    if (!booking_id || !rating) {
+      return res.status(400).json({
+        message: "booking_id and rating are required"
+      });
+    }
+
+    // -----------------------------
+    // ตรวจว่า booking นี้มีอยู่จริงไหม
+    // และเป็นของ user คนนี้หรือไม่
+    // -----------------------------
+    const booking = await bookings.findOne({
+      booking_id: booking_id,
+      user_id: req.user.user_id
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "booking not found"
+      });
+    }
+
+    // -----------------------------
+    // สร้าง review_id อัตโนมัติ
+    // -----------------------------
+    const lastReview = await reviews
+      .find({})
+      .sort({ review_id: -1 }) // เรียงจากมากไปน้อย
+      .limit(1)
+      .toArray();
+
+    // ถ้ามี review อยู่แล้ว → +1
+    const review_id =
+      lastReview.length > 0 ? lastReview[0].review_id + 1 : 5001;
+
+    // -----------------------------
+    // บันทึกข้อมูล review ลง MongoDB
+    // -----------------------------
+    await reviews.insertOne({
+      review_id: review_id,
+      booking_id: booking_id,
+      rating: rating,
+      comment: comment || "", // ถ้าไม่มี comment ให้เป็น string ว่าง
+      created_at: new Date() // เวลาที่รีวิว
+    });
+
+    // ส่ง response กลับ
+    res.json({
+      message: "review created successfully",
+      review_id: review_id
+    });
+
+  } catch (error) {
+
+    // ถ้า server error
+    res.status(500).json({
+      message: "error creating review"
+    });
+
+  }
+
+});
+
+// ===============================
+// GET /reviews
+// ใช้สำหรับดึงรีวิวทั้งหมดในระบบ
+// ===============================
+
+app.get("/reviews", async (req, res) => {
+
+  // เชื่อม collection reviews
+  const reviews = mongoose.connection.collection("reviews");
+
+  try {
+
+    // aggregate ใช้ join bookings เพื่อดูข้อมูลการจอง
+    const result = await reviews.aggregate([
+
+      {
+        $lookup: {
+          from: "bookings",          // join collection bookings
+          localField: "booking_id",  // field ใน reviews
+          foreignField: "booking_id",// field ใน bookings
+          as: "booking"
+        }
+      },
+
+      // แปลง booking array → object
+      { $unwind: "$booking" },
+
+      // เลือก field ที่ต้องการส่งกลับ
+      {
+        $project: {
+          _id: 0,
+          review_id: 1,
+          booking_id: 1,
+          rating: 1,
+          comment: 1,
+          created_at: 1
+        }
+      }
+
+    ]).toArray();
+
+    res.json(result);
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "error fetching reviews"
+    });
+
+  }
+
+});
+
+
+
+// ใช้สำหรับบันทึกการชำระเงินของ booking
+app.post("/payments", authMiddleware, async (req, res) => {
+
+  // collection ที่ต้องใช้
+  const payments = mongoose.connection.collection("payments");
+  const bookings = mongoose.connection.collection("bookings");
+  const booking_services = mongoose.connection.collection("booking_services");
+
+  try {
+
+    // รับข้อมูลจาก frontend
+    const { booking_id, payment_method } = req.body;
+
+    // ----------------------------
+    // ตรวจข้อมูลที่จำเป็น
+    // ----------------------------
+    if (!booking_id || !payment_method) {
+      return res.status(400).json({
+        message: "booking_id and payment_method required"
+      });
+    }
+
+    //  ตรวจว่า booking มีอยู่จริงไหม
+
+    const booking = await bookings.findOne({
+      booking_id: booking_id
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "booking not found"
+      });
+    }
+
+    // 2️⃣ ตรวจว่างานเสร็จหรือยัง
+    // ต้องเป็น status = completed
+
+    if (booking.status !== "completed") {
+      return res.status(400).json({
+        message: "service not completed yet"
+      });
+    }
+
+ 
+    //  ตรวจว่าจ่ายแล้วหรือยัง
+
+    const existingPayment = await payments.findOne({
+      booking_id: booking_id
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        message: "booking already paid"
+      });
+    }
+
+    //  คำนวณราคาจาก booking_services
+    const services = await booking_services.find({
+      booking_id: booking_id
+    }).toArray();
+
+    let total_amount = 0;
+
+    for (let s of services) {
+      total_amount += s.price_at_booking;
+    }
+
+
+    //  สร้าง payment_id ใหม่
+
+    const lastPayment = await payments
+      .find({})
+      .sort({ payment_id: -1 })
+      .limit(1)
+      .toArray();
+
+    const payment_id =
+      lastPayment.length > 0
+        ? lastPayment[0].payment_id + 1
+        : 8001;
+
+
+    // บันทึก payment
+
+    await payments.insertOne({
+      payment_id: payment_id,
+      booking_id: booking_id,
+      total_amount: total_amount,
+      payment_method: payment_method,
+      payment_status: "paid",
+      paid_at: new Date()
+    });
+
+    // ส่งผลลัพธ์กลับ
+    res.json({
+      message: "payment success",
+      total_amount: total_amount
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "error creating payment"
+    });
+
+  }
+
+});
+
+// ใช้ดูการชำระเงินของ booking
+app.get("/payments/:booking_id", authMiddleware, async (req, res) => {
+
+  const payments = mongoose.connection.collection("payments");
+
+  try {
+
+    // รับ booking_id จาก URL
+    const bookingId = parseInt(req.params.booking_id);
+
+    // ค้นหา payment
+    const payment = await payments.findOne({
+      booking_id: bookingId
+    });
+
+    // ถ้าไม่พบ
+    if (!payment) {
+      return res.status(404).json({
+        message: "payment not found"
+      });
+    }
+
+    // ส่งข้อมูลกลับ
+    res.json(payment);
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "error fetching payment"
+    });
+
+  }
+});
+
+// ดูรายการ payment ทั้งหมด (เฉพาะ admin / staff)
+app.get("/payments", authMiddleware, async (req, res) => {
+
+  const payments = mongoose.connection.collection("payments");
+
+  try {
+
+    // -----------------------------
+    // เช็ค role ก่อน
+    // -----------------------------
+    if (req.user.user_role !== "admin" && req.user.user_role !== "staff") {
+      return res.status(403).json({
+        message: "access denied"
+      });
+    }
+
+    // ดึง payment ทั้งหมด
+    const result = await payments.find({}).toArray();
+
+    res.json(result);
+
+  } catch (error) {
+
+    res.status(500).json({
+      message: "error fetching payments"
+    });
+
+  }
+
 });
 
 const PORT = process.env.PORT || 3000;
