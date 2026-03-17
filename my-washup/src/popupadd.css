@@ -1,0 +1,200 @@
+/* นำเข้าฟอนต์ที่ใกล้เคียงที่สุด */
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Prompt', sans-serif;
+}
+
+body {
+    background-color: #f0f2f5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* คอนเทนเนอร์หลักของการ์ด */
+.add-car-card {
+    background: #fff;
+    width: 100%;
+    max-width: 550px;
+    padding: 40px;
+    border-radius: 35px; /* โค้งมนมากเป็นพิเศษตามรูป */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+header p {
+    font-size: 14px;
+    color: #444;
+    margin-bottom: 30px;
+}
+
+/* จัดการ Label และ Badge ตัวเลข */
+.form-group label {
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.badge {
+    background-color: #f84444; /* สีแดงสว่าง */
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* ช่อง Input */
+input[type="text"] {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 50px; /* ทรงมนยาว */
+    border: 2px solid #e0e0e0;
+    background-color: #f0f0f0; /* พื้นหลังเทาอ่อนตามรูป */
+    font-size: 14px;
+    color: #333;
+    outline: none;
+    margin-bottom: 20px;
+}
+
+input[type="text"]::placeholder {
+    color: #bbb;
+}
+
+/* แถวคู่ (แบรนด์/รุ่น) */
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+
+.half {
+    flex: 1;
+}
+
+/* ส่วนเลือกประเภทรถ (Selector) */
+.type-selector {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.type-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 50px;
+    border: 2px solid #e0e0e0;
+    background-color: #f0f0f0;
+    color: #bbb;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+/* สถานะเมื่อถูกเลือก */
+/* --- ส่วนสำคัญ: ซ่อนปุ่มมาตรฐานของ Browser ที่เป็นสีฟ้าๆ --- */
+.radio-input {
+    display: none;
+}
+
+/* --- สไตล์กล่องตัวเลือก --- */
+.type-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 50px;
+    border: 2px solid #eee;
+    background-color: #f8f8f8;
+    color: #bbb;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* เมื่อปุ่มถูกเลือก (Active) */
+.type-option.active {
+    border-color: #f84444;
+    background-color: #fff1f1; /* แดงอ่อนๆ ตามที่คุณต้องการ */
+    color: #f84444;
+}
+
+/* วงกลม Custom Dot */
+.dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #bbb;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff; /* เพิ่มพื้นหลังขาวให้วงกลม */
+}
+
+/* เมื่อ Active ให้ขอบวงกลมเปลี่ยนสี */
+.active .dot {
+    border-color: #f84444;
+}
+
+/* จุดสีแดงตรงกลาง (สร้างด้วย ::after) */
+.active .dot::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background-color: #f84444;
+    border-radius: 50%;
+    display: block;
+}
+
+/* ปุ่มกดด้านล่าง */
+.form-actions {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.btn-cancel, .btn-save {
+    flex: 1;
+    padding: 16px;
+    border-radius: 50px;
+    font-size: 18px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.btn-cancel {
+    background-color: #bdbdbd; /* เทา */
+    color: #616161;
+}
+
+.btn-save {
+    background-color: #ff0000; /* แดงสด */
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.2);
+}
+
+.btn-cancel:active, .btn-save:active {
+    transform: scale(0.98);
+}

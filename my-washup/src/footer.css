@@ -105,3 +105,39 @@
     text-align: left;
   }
 }
+/* ---------------- Bottom Bar (ลิขสิทธิ์) ---------------- */
+.footer-bottom {
+  border-top: 1px solid #333;
+  margin-top: 40px;
+  padding-top: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #aaaaaa;
+  font-weight: 300;
+}
+
+/* ---------------- Hover Smooth เพิ่มความลื่น ---------------- */
+.footer-col-2 ul li a,
+.footer-socials a {
+  transition: all 0.3s ease;
+}
+
+/* ---------------- Responsive เพิ่มเติม (มือถือเล็ก) -------ฤ--------- */
+@media (max-width: 480px) {
+  .footer-container {
+    padding: 40px 6%;
+  }
+
+  .footer-col-1 p {
+    font-size: 13px;
+  }
+
+  .footer-col-2 h4,
+  .footer-col-3 h4 {
+    font-size: 18px;
+  }
+
+  .footer-socials a {
+    font-size: 22px;
+  }
+}
