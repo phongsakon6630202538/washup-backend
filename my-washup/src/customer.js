@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // เตรียมข้อมูลให้ตรงกับ API (POST /vehicles)
       const activeType = document.querySelector('.type-option.active');
       const car_type = activeType?.dataset.type;
-      const vehicle_type_id = car_type === "sedan" ? 1 : 2;
+    const vehicle_type_id = car_type === "sedan" ? 1 : 2;
       const formData = {
         vehicle_type_id,
         license_plate: document.getElementById('license_plate').value,
@@ -133,18 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
 function checkLoginStatus() {
   const userStr = localStorage.getItem("user");
   if (!userStr || userStr === "undefined" || userStr === "null") return;
-
   try {
     const user = JSON.parse(userStr);
     if (!user || !user.login_name) return;
-
-    // --- 1. สั่งลบเฉพาะส่วนท้ายของหน้า (Ready Section) เมื่อ Login แล้ว ---
-    const readySection = document.getElementById("ready-section");
-    if (readySection) {
-      readySection.style.display = "none"; 
-    }
-
-    // --- 2. ส่วนจัดการ Navbar ด้านบน (คงไว้เหมือนเดิมเพื่อให้แถบเมนูยังอยู่) ---
     const authSectionCustomer = document.getElementById("nav-auth-section");
     if (authSectionCustomer) {
       authSectionCustomer.innerHTML = `
@@ -152,19 +143,26 @@ function checkLoginStatus() {
         <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>
       `;
     }
-    
-    // ส่วนของ Staff Navbar (ถ้ามี) ก็คงไว้เช่นกัน...
-    // ...
-    
+    const authSectionStaff = document.getElementById("nav-auth-section-staff");
+    if (authSectionStaff) {
+      authSectionStaff.innerHTML = `
+        <span class="btn-user-badge">STAFF: ${user.login_name}</span>
+        <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>
+      `;
+    }
   } catch (error) {
     localStorage.removeItem("user");
   }
 }
 
-function logoutUser() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-  window.location.href = "index.html";
+// แก้ไขจากฟังก์ชันธรรมดา ให้เป็น window.logoutUser เพื่อให้ HTML เรียกใช้ได้
+window.logoutUser = function() {
+  if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("tempBooking"); // ล้างข้อมูลการจองค้างไว้ด้วย
+    window.location.href = "index.html";
+  }
 }
 
 function setActiveMenu() {
@@ -180,5 +178,3 @@ function setActiveMenu() {
     if (history) history.classList.add("active");
   }
 }
-
-

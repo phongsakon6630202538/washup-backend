@@ -11,67 +11,155 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    const userBadge = document.getElementById("user-fullname");
-    if (userBadge) userBadge.textContent = user.fullname;
+    // --- แก้ไขเฉพาะส่วน NAV เริ่มต้นตรงนี้ ---
+    const navPlaceholder = document.getElementById("navbar-placeholder");
+    const navStaffPlaceholder = document.getElementById("navbar-staff-placeholder");
 
-    // --- 1. จัดการข้อมูลรถ ---
+    if (navPlaceholder) {
+        fetch("components/navbar.html")
+            .then((res) => res.text())
+            .then((data) => {
+                navPlaceholder.innerHTML = data;
+                checkLoginStatus(); // แสดงชื่อ User และปุ่ม Logout ตาม CSS ใหม่
+                setActiveMenu();    // สั่งให้เมนู "จองบริการ" เป็นตัวหนา (Active)
+            });
+    } else if (navStaffPlaceholder) {
+        fetch("components/navbar-staff.html")
+            .then((res) => res.text())
+            .then((data) => {
+                navStaffPlaceholder.innerHTML = data;
+                checkLoginStatus();
+                setActiveMenu();
+            });
+    }
+
+    // ฟังก์ชันจัดการสถานะเมนู (Active) ให้ตัวหนาตามหน้าปัจจุบัน
+    function setActiveMenu() {
+        const currentPage = window.location.pathname.split("/").pop() || "index.html";
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            if (item.getAttribute('href') === currentPage) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    }
+
+    // ฟังก์ชันเปลี่ยนปุ่ม LOGIN เป็น Badge ชื่อผู้ใช้ (ตาม CSS .btn-user-badge)
+    function checkLoginStatus() {
+        const userStr = localStorage.getItem("user");
+        if (!userStr || userStr === "undefined") return;
+        const userData = JSON.parse(userStr);
+        
+        const authSection = document.getElementById("nav-auth-section");
+        if (authSection && userData.login_name) {
+            authSection.innerHTML = `
+                <a href="profile.html" class="btn-user-badge">${userData.login_name}</a>
+                <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>
+            `;
+        }
+    }
+
+    // ฟังก์ชัน Logout ให้ปุ่มใน Nav ทำงานได้
+    window.logoutUser = function() {
+        localStorage.clear();
+        window.location.href = "index.html";
+    };
+    // --- สิ้นสุดส่วนที่แก้ NAV ---
+
+    // หลังจากนี้เป็นส่วนเดิมของคุณ (จัดการรถ / บริการ / ยืนยันจอง) ห้ามลบหรือเปลี่ยน
+    fetch("components/footer.html")
+        .then((res) => res.text())
+        .then((data) => {
+            const footer = document.getElementById("footer-placeholder");
+            if (footer) footer.innerHTML = data;
+        });
+
+    // ... (โค้ดจัดการรถและยืนยันการจองส่วนเดิมของคุณทั้งหมด) ...
+    // --- 2. จัดการข้อมูลรถ ---
     let selectedCar = null;
+
     async function fetchUserVehicles() {
         try {
-            const res = await fetch(`http://localhost:3000/vehicles/user`, {
+            const res = await fetch(`http://localhost:3000/api/vehicles/user`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
-            const cars = await res.json();
-            if (cars && cars.length > 0) {
-                selectedCar = cars[0]; 
-                renderCarDetail(selectedCar);
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+                renderAllCars(data);
+            } else {
+                renderNoCar();
             }
         } catch (e) {
-            console.error("Car load error", e);
+            console.error("เกิดข้อผิดพลาดในการดึงข้อมูลรถ:", e);
+            renderNoCar();
         }
     }
 
-    function renderCarDetail(car) {
+    function renderAllCars(cars) {
         const carSection = document.getElementById("car-section-content");
         if (!carSection) return;
-        carSection.innerHTML = `
-            <div class="service-card" style="background:#fff; border:1px solid #ddd; cursor:default; width:100%; display:flex; align-items:center;">
-                <div class="car-icon-bg" style="margin:0 20px 0 0; width:50px; height:50px; font-size:20px;">
+
+        const carsHtml = cars.map((car) => `
+            <div class="service-card car-item" 
+                 id="car-${car.vehicle_id}" 
+                 onclick="selectCarAction(${JSON.stringify(car).replace(/"/g, '&quot;')})"
+                 style="background:#fff; border:1px solid #ddd; cursor:pointer; width:100%; display:flex; align-items:center; padding: 15px; border-radius: 12px; margin-bottom: 10px; transition: 0.3s;">
+                <div class="car-icon-bg" style="margin-right:20px; width:50px; height:50px; background: #fdf2f2; color: #d71920; display: flex; align-items:center; justify-content: center; border-radius: 50%; font-size:20px;">
                     <i class="fas fa-car"></i>
                 </div>
-                <div class="service-detail">
-                    <h4>${car.brand} ${car.model}</h4>
-                    <p>ทะเบียน: ${car.license_plate} | สี: ${car.color}</p>
+                <div class="service-detail" style="flex-grow: 1;">
+                    <h4 style="margin: 0; font-size: 16px;">${car.brand} ${car.model}</h4>
+                    <p style="margin: 5px 0 0; color: #666; font-size: 14px;">ทะเบียน: ${car.license_plate} | สี: ${car.color}</p>
                 </div>
-                <div class="service-price" style="color:#d71920; font-size:12px; cursor:pointer;" onclick="window.location.href='popupadd.html'">
-                    แก้ไข
+                <div class="select-indicator" style="color:#ccc;">
+                    <i class="fas fa-check-circle" style="font-size: 20px;"></i>
                 </div>
             </div>
-        `;
+        `).join('');
+
+        carSection.innerHTML = `<div style="display: flex; flex-direction: column; gap: 5px;">${carsHtml}
+            <div style="text-align: right; margin-top: 5px;">
+                <button type="button" onclick="window.location.href='popupadd.html'" style="background: none; border: none; color: #d71920; cursor: pointer; font-size: 13px;">+ เพิ่มรถคันใหม่</button>
+            </div></div>`;
+        selectCarAction(cars[0]);
     }
 
-    // --- 2. ดึงข้อมูลบริการจาก API & จัดการ URL ---
+    window.selectCarAction = function(car) {
+        selectedCar = car;
+        document.querySelectorAll('.car-item').forEach(el => {
+            el.style.borderColor = "#ddd";
+            el.querySelector('.select-indicator').style.color = "#ccc";
+        });
+        const activeCard = document.getElementById(`car-${car.vehicle_id}`);
+        if (activeCard) {
+            activeCard.style.borderColor = "#d71920";
+            activeCard.querySelector('.select-indicator').style.color = "#d71920";
+        }
+    };
+
+    function renderNoCar() {
+        const carSection = document.getElementById("car-section-content");
+        if (!carSection) return;
+        carSection.innerHTML = `<div class="service-card" style="border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer;" onclick="window.location.href='popupadd.html'">
+            <i class="fas fa-plus-circle" style="font-size: 24px; color: #ccc;"></i>
+            <p style="margin-top: 10px; color: #888;">คุณยังไม่มีข้อมูลรถ คลิกเพื่อเพิ่มรถ</p>
+        </div>`;
+    }
+
+    // --- 3. ระบบบริการและราคา ---
     async function fetchServices() {
         try {
-            const response = await fetch("http://localhost:3000/service");
-            const services = await response.json();
-            
-            // ถ้าคุณมีฟังก์ชัน renderServices ให้เรียกตรงนี้
-            // renderServices(services); 
-
-            // จัดการเลือกแพ็กเกจจาก URL ต่อทันทีที่โหลดข้อมูลเสร็จ
+            await fetch("http://localhost:3000/api/service");
             handleUrlParams();
-        } catch (error) {
-            console.error("Error fetching services:", error);
-        }
+        } catch (error) { console.error(error); }
     }
 
     function handleUrlParams() {
         const urlParams = new URLSearchParams(window.location.search);
         const serviceIdFromUrl = urlParams.get('service_id');
-
         if (serviceIdFromUrl) {
-            // หา Input ที่มี value ตรงกับ ID จาก URL
             const targetRadio = document.querySelector(`input[name="main_service"][value="${serviceIdFromUrl}"]`);
             if (targetRadio) {
                 targetRadio.checked = true;
@@ -81,20 +169,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // --- 3. ระบบคำนวณราคา ---
     function calculatePrice() {
         let sum = 0;
         const mainService = document.querySelector('input[name="main_service"]:checked');
-        if (mainService) {
-            // ถ้า value เป็น ID ให้ใช้ data-price แทน (ถ้าคุณใส่ไว้ใน HTML)
-            // แต่ถ้าใน HTML value เป็นราคาอยู่แล้ว ก็ใช้ค่านี้ได้เลย
-            sum += parseInt(mainService.value || 0);
-        }
+        if (mainService) sum += parseInt(mainService.value || 0);
         const addons = document.querySelectorAll('#addon-service-group input:checked');
-        addons.forEach(addon => {
-            sum += parseInt(addon.value || 0);
-        });
-
+        addons.forEach(addon => { sum += parseInt(addon.value || 0); });
         if (totalDisplay) totalDisplay.textContent = sum.toLocaleString();
     }
 
@@ -115,47 +195,85 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     });
 
-    // --- 5. ยืนยันการจอง ---
+    // --- 5. ยืนยันการจอง (จุดสำคัญที่แก้ไข) ---
     const submitBtn = document.getElementById("submit-booking");
     if (submitBtn) {
-        submitBtn.addEventListener("click", () => {
+        submitBtn.addEventListener("click", async () => {
             const mainService = document.querySelector('input[name="main_service"]:checked');
             const selectedTime = document.querySelector(".time-item.selected");
             const selectedDate = document.querySelector(".date-item.active");
 
             if (!mainService) return alert("กรุณาเลือกบริการหลัก");
             if (!selectedTime) return alert("กรุณาเลือกเวลา");
-            if (!selectedCar) return alert("ไม่พบข้อมูลรถของคุณ");
+            if (!selectedDate) return alert("กรุณาเลือกวันที่");
+            if (!selectedCar) return alert("ไม่พบข้อมูลรถของคุณ (กรุณาเลือกรถ)");
 
-            const addonIds = [];
-            document.querySelectorAll("#addon-service-group input:checked").forEach((el) => {
-                addonIds.push(parseInt(el.dataset.id)); // สมมติว่าเก็บ ID ไว้ใน data-id
-            });
+            // ดึง ID จาก dataset.id ที่คุณใส่ไว้ใน HTML
+            const mainId = parseInt(mainService.dataset.id);
+            const addonIds = Array.from(document.querySelectorAll("#addon-service-group input:checked"))
+                                  .map(el => parseInt(el.dataset.id))
+                                  .filter(id => !isNaN(id));
 
-            const bookingData = {
+            if (isNaN(mainId)) return alert("ไม่พบ ID บริการหลัก (เช็ค data-id ใน HTML)");
+
+            const bookingDatetime = `${selectedDate.dataset.date}T${selectedTime.dataset.time}:00`;
+
+            const payload = {
                 vehicle_id: selectedCar.vehicle_id,
-                service_id: parseInt(mainService.dataset.id), // ID บริการหลัก
-                addon_ids: addonIds,
-                booking_date: selectedDate.dataset.date,
-                booking_time: selectedTime.dataset.time,
-                total_price: parseInt(totalDisplay.textContent.replace(/,/g, '')),
-                display_name: mainService.dataset.name // สำหรับโชว์ในหน้าถัดไป
+                booking_datetime: bookingDatetime,
+                services: [mainId, ...addonIds]
             };
 
-            localStorage.setItem("tempBooking", JSON.stringify(bookingData));
-            window.location.href = "confirm.html";
+            try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "กำลังบันทึก...";
+                const response = await fetch("http://localhost:3000/api/bookings", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert("จองสำเร็จ!");
+                    window.location.href = "history.html";
+                } else {
+                    alert("ล้มเหลว: " + (result.message || "เช็คราคาไม่สำเร็จ"));
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "ยืนยันการจอง";
+                }
+            } catch (error) {
+                alert("Server Error");
+                submitBtn.disabled = false;
+            }
         });
     }
 
-    // --- 6. Event Listeners ---
+    // --- 6. ฟังก์ชันเสริม ---
+    function checkLoginStatus() {
+        const userData = JSON.parse(localStorage.getItem("user"));
+        if (!userData) return;
+        const authSection = document.getElementById("nav-auth-section");
+        if (authSection) {
+            authSection.innerHTML = `<a href="profile.html" class="btn-user-badge">${userData.login_name}</a>
+                                     <button onclick="logoutUser()" class="btn-logout">LOGOUT</button>`;
+        }
+    }
+
+    window.logoutUser = function() {
+        localStorage.clear();
+        window.location.href = "index.html";
+    };
+
     document.addEventListener('change', (e) => {
         if (e.target.name === 'main_service' || e.target.closest('#addon-service-group')) {
             calculatePrice();
         }
     });
 
-    // --- เริ่มทำงานตามลำดับ ---
-    await fetchUserVehicles(); // โหลดรถก่อน
-    await fetchServices();     // โหลดบริการและเช็ค URL
-    calculatePrice();          // คำนวณราคาสรุป
+    await fetchUserVehicles();
+    await fetchServices();
+    calculatePrice();
 });

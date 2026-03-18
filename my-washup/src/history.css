@@ -1,0 +1,148 @@
+:root {
+    --main-red: #d71920;
+    --bg-gray: #f9f9f9;
+}
+
+/* ล็อคพื้นฐานเพื่อไม่ให้หน้าจอส่าย */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    overflow-x: hidden;
+    font-family: 'Kanit', sans-serif;
+    background-color: var(--bg-gray);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* จัดระเบียบเนื้อหาหลักให้ตรงกับหน้าอื่น */
+.main-content {
+    flex: 1; /* ดัน Footer ลงล่างสุดเสมอ */
+    max-width: 1000px; /* ขยายจาก 800px เพื่อให้ไม่ดูอึดอัด */
+    width: 100%;
+    margin: 0 auto;
+    padding: 120px 20px 60px; /* เว้นที่ด้านบนให้ Nav และล่างให้ Footer */
+    box-sizing: border-box;
+}
+
+.history-header {
+    margin-bottom: 40px;
+}
+
+.history-header h1 {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #222;
+}
+
+.section-title {
+    font-size: 1.2rem;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 10px;
+    margin: 40px 0 20px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-section .section-title {
+    color: var(--main-red);
+    border-color: var(--main-red);
+}
+
+/* Booking Card */
+.booking-card {
+    background: #fff;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #eee;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transition: transform 0.2s;
+}
+
+.booking-card:hover {
+    transform: translateY(-2px);
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.booking-info h3 {
+    margin: 0;
+    color: var(--main-red);
+    font-size: 1.1rem;
+}
+
+.booking-info p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.price-tag {
+    background: #fff0f0;
+    color: var(--main-red);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.car-display {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px 0;
+}
+
+.car-circle {
+    width: 50px;
+    height: 50px;
+    background: var(--main-red);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.car-text b { font-size: 1.1rem; text-transform: uppercase; }
+.car-text p { margin: 2px 0; color: #777; font-size: 0.9rem; }
+
+/* Status Steps */
+.status-tracker {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px dashed #eee;
+}
+
+.step { text-align: center; color: #ccc; flex: 1; font-size: 0.8rem; }
+.step i { font-size: 1.2rem; display: block; margin-bottom: 5px; }
+.step.active { color: var(--main-red); }
+
+.cancel-link {
+    display: block;
+    text-align: right;
+    margin-top: 10px;
+    color: #999;
+    font-size: 0.85rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* คลาสช่วยสำหรับสถานะการโหลด */
+.loading-text {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}

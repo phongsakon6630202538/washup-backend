@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 // ยิง API ไปที่ Server (ปรับ URL ตามจริงของคุณ)
-                const response = await fetch("http://localhost:3000/vehicles", {
+                const response = await fetch("http://localhost:3000/api/vehicles", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

@@ -1,0 +1,136 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Kanit', sans-serif;
+}
+
+body {
+    background-color: #f2f2f2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #fff;
+    width: 90%;
+    max-width: 950px;
+    display: flex;
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+    padding: 20px; /* เว้นขอบด้านในเพื่อให้เห็นพื้นที่สีขาวรอบๆ */
+}
+
+/* ส่วนรูปภาพ */
+.image-section {
+    flex: 1;
+    background-image: url('https://media.istockphoto.com/id/1287044692/th/%E0%B8%A3%E0%B8%B9%E0%B8%9B%E0%B8%96%E0%B9%88%E0%B8%B2%E0%B8%A2/%E0%B8%84%E0%B8%99%E0%B8%87%E0%B8%B2%E0%B8%99%E0%B8%A5%E0%B9%89%E0%B8%B2%E0%B8%87%E0%B8%A3%E0%B8%96%E0%B8%AA%E0%B8%B5%E0%B9%81%E0%B8%94%E0%B8%87%E0%B8%94%E0%B9%89%E0%B8%A7%E0%B8%A2%E0%B8%9F%E0%B8%AD%E0%B8%87%E0%B8%99%E0%B9%89%E0%B9%8D%E0%B8%B2%E0%B8%9A%E0%B8%99%E0%B8%A5%E0%B9%89%E0%B8%B2%E0%B8%87%E0%B8%A3%E0%B8%96.jpg?s=612x612&w=0&k=20&c=QlD8gucdRSZVFyBQwTv4X0nXNwdGNzKCJxrzN6T7_eE=');
+    background-size: cover;
+    background-position: center;
+    border-radius: 25px; /* รูปโค้งมนตามรูปภาพ */
+    position: relative;
+    min-height: 550px;
+}
+
+.brand-name {
+    position: absolute;
+    top: 25px;
+    left: 25px;
+    color: #ccc;
+    font-size: 14px;
+}
+
+/* ส่วนฟอร์ม */
+.form-section {
+    flex: 1.2;
+    padding: 40px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+h2 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.input-group {
+    margin-bottom: 15px;
+}
+
+.input-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.input-wrapper {
+    position: relative;
+}
+
+.input-wrapper input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 10px;
+    background-color: #fff;
+    font-size: 14px;
+    outline: none;
+    transition: 0.3s;
+}
+
+.input-wrapper input:focus {
+    border-color: #d71920;
+}
+
+.input-wrapper i {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ccc;
+}
+
+.register-btn {
+    width: 100%;
+    padding: 14px;
+    background-color: #e30613; /* สีแดงตามแบรนด์ */
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: 0.3s;
+}
+
+.register-btn:hover {
+    background-color: #b3050f;
+}
+
+.footer-text {
+    text-align: left;
+    margin-top: 20px;
+    font-size: 12px;
+    color: #666;
+}
+
+.footer-text a {
+    color: #e30613;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+    .image-section { display: none; }
+    .container { max-width: 450px; }
+    .form-section { padding: 30px; }
+}

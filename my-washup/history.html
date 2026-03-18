@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประวัติการจอง - WASH UP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    
+    <link rel="stylesheet" href="./src/nav.css" />
+    <link rel="stylesheet" href="./src/footer.css" />
+    <link rel="stylesheet" href="./src/history.css" />
+</head>
+<body>
+    <div id="navbar-placeholder"></div>
+
+    <div class="main-content"> 
+        <header class="history-header">
+            <h1>ประวัติและติดตามสถานะ</h1>
+            <p>ติดตามและจัดการบริการล้างรถระดับพรีเมียมของคุณ</p>
+        </header>
+
+        <section class="status-section">
+            <h2 class="section-title"><i class="fas fa-spinner fa-spin"></i> กำลังดำเนินการอยู่</h2>
+            <div id="current-bookings-list">
+                <p class="loading-text">กำลังโหลดข้อมูล...</p>
+            </div>
+        </section>
+
+        <section class="history-section">
+            <h2 class="section-title"><i class="fas fa-check-double"></i> ประวัติการจองที่ผ่านมา</h2>
+            <div id="past-bookings-list">
+                </div>
+        </section>
+    </div>
+
+    <div id="footer-placeholder"></div>
+
+    <script type="module" src="./src/history.js"></script>
+</body>
+</html>
