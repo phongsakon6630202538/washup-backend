@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import "./dashboard.css";
 
 interface Booking {
   booking_id: number;
   booking_datetime: string;
   status: string;
-  customer_name?: string; // 👈 เพิ่มไว้รับชื่อลูกค้า
+  customer_name?: string;
   vehicle: {
     brand: string;
     model: string;
@@ -14,6 +15,26 @@ interface Booking {
 }
 export default function StaffDashboard() {
   const [jobs, setJobs] = useState<Booking[]>([]);
+  const [showConfirmModal, setShowConfirmModal] = useState<Booking | null>(
+    null,
+  ); // จำว่ากำลังกดคันไหน
+  const [showInspectionModal, setShowInspectionModal] =
+    useState<Booking | null>(null);
+
+  const [carCondition, setCarCondition] = useState("ปกติ");
+  const [staffNote, setStaffNote] = useState("");
+
+  const [showCompleteModal, setShowCompleteModal] = useState<Booking | null>(
+    null,
+  ); // สำหรับ STEP 3
+
+  // 1. ตัวแปรเก็บว่ากำลังเปิด Popup ชำระเงินของคันไหน
+  const [showPaymentModal, setShowPaymentModal] = useState<Booking | null>(
+    null,
+  );
+
+  // 2. เก็บช่องทางชำระเงิน (cash, transfer, credit)
+  const [paymentMethod, setPaymentMethod] = useState("cash");
 
   const fetchBookings = () => {
     const token = localStorage.getItem("token");
@@ -23,7 +44,6 @@ export default function StaffDashboard() {
       return;
     }
 
-    // เหลือแค่อันนี้อันเดียวพอครับ
     fetch("http://localhost:3000/api/bookings", {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -38,13 +58,17 @@ export default function StaffDashboard() {
       .catch((err) => console.error("โหลดข้อมูลพัง:", err));
   };
 
-  // ดึงข้อมูลครั้งแรกตอนเปิดหน้าเว็บ
   useEffect(() => {
     fetchBookings();
   }, []);
 
-  // 2️⃣ ฟังก์ชันอัปเดตสถานะรถ (PUT)
-  const updateStatus = async (bookingId: number, newStatus: string) => {
+  // ฟังก์ชันอัปเดตสถานะรถ (PUT)
+  // 👈 เพิ่ม extraData เข้ามาเผื่อส่งข้อมูลอื่นนอกจาก status
+  const updateStatus = async (
+    bookingId: number,
+    newStatus: string,
+    extraData: any = {},
+  ) => {
     const token = localStorage.getItem("token");
 
     try {
@@ -54,18 +78,51 @@ export default function StaffDashboard() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // ยื่นบัตรผ่าน
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ status: newStatus }),
+          // 👈 เอา extraData มารวมกับ status แล้วส่งไปทีเดียว
+          body: JSON.stringify({ status: newStatus, ...extraData }),
         },
       );
 
       if (response.ok) {
-        // ✅ สั่งโหลดข้อมูลใหม่จาก Server ทันทีที่อัปเดตสำเร็จ
         fetchBookings();
       } else {
         const data = await response.json();
-        alert("Error: " + data.message); // จะได้รู้ว่าทำไม Server ถึงไม่ยอมให้ผ่าน
+        alert("Error: " + data.message);
+      }
+    } catch (err) {
+      console.error("เชื่อมต่อพัง:", err);
+    }
+  };
+
+  const handlePayment = async (bookingId: number) => {
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch("http://localhost:3000/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          payment_method: paymentMethod,
+        }), // ส่งข้อมูลไปบันทึก
+      });
+
+      const data = await response.json();
+
+      if (response.ok || data.message === "booking already paid") {
+        // ✅ เคล็ดลับให้หายไปเลย: ใช้ setJobs กรอง (Filter) รถคันนี้ทิ้งออกจากหน้าจอทันที
+        setJobs((prevJobs) =>
+          prevJobs.filter((job) => job.booking_id !== bookingId),
+        );
+        setShowPaymentModal(null); // ปิด Popup
+        alert("บันทึกการชำระเงินสำเร็จ!");
+      } else {
+        alert("Error: " + data.message);
       }
     } catch (err) {
       console.error("เชื่อมต่อพัง:", err);
@@ -74,7 +131,7 @@ export default function StaffDashboard() {
   // ฟังก์ชันตัวช่วยดึงข้อมูลตาม Status ของ Backend
   const getJobs = (status: string) => jobs.filter((j) => j.status === status);
 
-  // ฟังก์ชันตัวช่วยจัดรูปแบบเวลา (จาก 2023-10-27T10:00:00Z -> 27 ก.พ. - 10:00 น.)
+  // ฟังก์ชันตัวช่วยจัดรูปแบบเวลา
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
     return `${date.getDate()} ${date.toLocaleString("th-TH", { month: "short" })} - ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")} น.`;
@@ -82,28 +139,6 @@ export default function StaffDashboard() {
 
   return (
     <>
-      {/* 🎨 CSS (ใช้ตัวเดิมที่คุณตูนเพิ่งขยายเต็มจอได้เลย ผมย่อไว้เพื่อประหยัดพื้นที่) */}
-      <style>{`
-        .staff-board-bg { background-color: #f8f9fa; padding: 40px 5%; min-height: 80vh; font-family: 'Kanit', sans-serif; }
-        .board-grid-original { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; width: 100%; }
-        .col-wrapper { display: flex; flex-direction: column; gap: 15px; }
-        .col-header { display: flex; justify-content: space-between; align-items: center; color: white; padding: 12px 20px; border-radius: 8px; font-weight: 600; }
-        .col-count { font-weight: normal; font-size: 14px; }
-        .col-body-dashed { border: 2px dashed #ccc; border-radius: 8px; padding: 15px; min-height: 500px; }
-        .bg-darknavy { background-color: #2c3e50; } .bg-yellow { background-color: #fbbc05; color: #333 !important; } .bg-blue { background-color: #4285f4; } .bg-green { background-color: #0f9d58; }
-        .job-card-og { background: #ffffff; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #ddd; }
-        .border-darknavy { border-color: #2c3e50; } .border-yellow { border-color: #fbbc05; } .border-blue { border-color: #4285f4; } .border-green { border-color: #0f9d58; }
-        .card-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 10px; }
-        .card-user { color: #d71920; } .card-time { color: #888; font-weight: normal; }
-        .card-car-info { margin-bottom: 10px; } .car-model { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 2px; } .car-license { font-size: 13px; color: #666; }
-        .card-services { background-color: #f1f3f5; padding: 10px; border-radius: 6px; font-size: 12px; color: #555; margin-bottom: 15px; }
-        .card-services div { margin-bottom: 4px; display: flex; align-items: center; gap: 6px; } .card-services i { color: #d71920; font-size: 10px; }
-        .card-actions { display: flex; gap: 10px; justify-content: center; }
-        .btn-sm { flex: 1; padding: 8px 0; border: none; border-radius: 20px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-sm:hover { opacity: 0.9; }
-        .btn-red { background-color: #d71920; } .btn-darknavy { background-color: #2c3e50; } .btn-yellow { background-color: #fbbc05; color: #333; } .btn-blue { background-color: #4285f4; } .btn-green { background-color: #0f9d58; }
-      `}</style>
-
       <div className="staff-board-bg">
         <div className="board-grid-original">
           {/* ----- คอลัมน์ 1: รอยืนยัน (Backend = pending) ----- */}
@@ -152,11 +187,11 @@ export default function StaffDashboard() {
                   </div>
                   <div className="card-actions">
                     <button className="btn-sm btn-red">ปฏิเสธ</button>
-                    {/* 🚀 กดแล้วส่งสถานะ 'confirmed' ไปให้ Backend */}
-                    {/* 🚀 ปุ่มยืนยันคิว ต้องส่ง "confirmed" ตัวพิมพ์เล็กทั้งหมดตาม Backend */}
+
+                    {/* 🚀 แก้ตรงนี้ครับ เปลี่ยนจาก updateStatus เป็น setShowConfirmModal เพื่อเปิด Popup */}
                     <button
                       className="btn-sm btn-darknavy"
-                      onClick={() => updateStatus(job.booking_id, "confirmed")}
+                      onClick={() => setShowConfirmModal(job)}
                     >
                       ยืนยันคิว
                     </button>
@@ -208,15 +243,17 @@ export default function StaffDashboard() {
                     )}
                   </div>
                   <div className="card-actions">
-                    <button className="btn-sm btn-red">ลูกค้ามาสาย</button>
-                    {/* 🚀 กดแล้วส่งสถานะ 'in_progress' ไปให้ Backend */}
+                    {/* 🚀 แก้ตรงนี้ครับ เปลี่ยนจาก updateStatus เป็นเปิด Popup Inspection แทน */}
                     <button
-                      className="btn-sm btn-yellow"
-                      onClick={() =>
-                        updateStatus(job.booking_id, "in_progress")
-                      }
+                      className="btn-sm btn-darknavy"
+                      style={{ width: "100%" }}
+                      onClick={() => {
+                        setCarCondition("ปกติ");
+                        setStaffNote("");
+                        setShowInspectionModal(job); // เปิด Popup ของคันนี้
+                      }}
                     >
-                      รับรถและเริ่มล้างรถ
+                      เริ่มล้างรถ
                     </button>
                   </div>
                 </div>
@@ -268,10 +305,10 @@ export default function StaffDashboard() {
                     )}
                   </div>
                   <div className="card-actions">
-                    {/* 🚀 กดแล้วส่งสถานะ 'completed' ไปให้ Backend */}
+                    {/* 🚀 แก้ตรงนี้ครับ เปลี่ยนให้มาเปิด Popup สีฟ้าแทน */}
                     <button
                       className="btn-sm btn-blue"
-                      onClick={() => updateStatus(job.booking_id, "completed")}
+                      onClick={() => setShowCompleteModal(job)}
                     >
                       ล้างเสร็จสิ้น
                     </button>
@@ -324,7 +361,13 @@ export default function StaffDashboard() {
                     )}
                   </div>
                   <div className="card-actions">
-                    <button className="btn-sm btn-green">
+                    <button
+                      className="btn-sm btn-green"
+                      onClick={() => {
+                        setPaymentMethod("cash"); // รีเซ็ตให้กลับมาเป็นเงินสดทุกครั้งที่เปิด
+                        setShowPaymentModal(job); // เปิด Popup
+                      }}
+                    >
                       ชำระเงินเสร็จสิ้น
                     </button>
                   </div>
@@ -333,6 +376,660 @@ export default function StaffDashboard() {
             </div>
           </div>
         </div>
+
+        {/* STEP 1: Popup ยืนยันการจอง */}
+        {showConfirmModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              fontFamily: "Kanit",
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                padding: "30px",
+                borderRadius: "20px",
+                width: "90%",
+                maxWidth: "350px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: "80px",
+                  height: "80px",
+                  backgroundColor: "#e8f5e9",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px",
+                }}
+              >
+                <span style={{ color: "#4CAF50", fontSize: "40px" }}>✔</span>
+              </div>
+
+              <h3
+                style={{
+                  color: "#FF5722",
+                  marginBottom: "10px",
+                  fontSize: "18px",
+                }}
+              >
+                STEP 1 : ยืนยันการจอง
+              </h3>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#666",
+                  marginBottom: "5px",
+                  fontWeight: "bold",
+                }}
+              >
+                ต้องการยืนยันรับคิวนี้ใช่หรือไม่?
+              </p>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "#999",
+                  marginBottom: "25px",
+                }}
+              >
+                การยืนยันนี้จะทำให้คิวล็อกช่วงเวลาทำงานของคุณทันที
+              </p>
+
+              <div style={{ display: "flex", gap: "15px" }}>
+                <button
+                  onClick={() => setShowConfirmModal(null)}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "#eeeeee",
+                    color: "#666",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ยกเลิก
+                </button>
+
+                <button
+                  onClick={async () => {
+                    await updateStatus(
+                      showConfirmModal.booking_id,
+                      "confirmed",
+                    ); // สั่งอัปเดตสถานะ
+                    setShowConfirmModal(null); // ปิด Popup
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "#A5F3D0",
+                    color: "#065F46",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ตกลง
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* STEP 2: Popup บันทึกสภาพรถ */}
+        {showInspectionModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              fontFamily: "Kanit",
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                padding: "30px",
+                borderRadius: "20px",
+                width: "90%",
+                maxWidth: "380px",
+                textAlign: "left",
+              }}
+            >
+              {/* Header: USERNAME | JOB ID */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "15px",
+                }}
+              >
+                <span
+                  style={{
+                    backgroundColor: "#e60000",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {showInspectionModal.customer_name || "USERNAME"}
+                </span>
+                <span style={{ color: "#999", fontSize: "12px" }}>
+                  JOB ID : {showInspectionModal.booking_id}
+                </span>
+              </div>
+
+              <h3
+                style={{
+                  color: "#FF5722",
+                  marginBottom: "15px",
+                  fontSize: "18px",
+                  textAlign: "center",
+                }}
+              >
+                STEP 2 : บันทึกสภาพรถ
+              </h3>
+
+              {/* ข้อมูลรถ */}
+              <div
+                style={{
+                  backgroundColor: "#f5f5f5",
+                  padding: "10px 15px",
+                  borderRadius: "12px",
+                  fontSize: "13px",
+                  marginBottom: "20px",
+                }}
+              >
+                <div>
+                  🚗 {showInspectionModal.vehicle.brand}{" "}
+                  {showInspectionModal.vehicle.model}
+                </div>
+                <div style={{ marginTop: "5px" }}>
+                  ⏰ ลูกค้าเข้า :{" "}
+                  {formatTime(showInspectionModal.booking_datetime)} น.
+                </div>
+              </div>
+
+              {/* ส่วนเลือกสภาพรถ */}
+              <label
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  display: "block",
+                  marginBottom: "10px",
+                }}
+              >
+                สภาพรถ{" "}
+                <span style={{ color: "red", fontSize: "11px" }}>
+                  * ตัวอย่าง
+                </span>
+              </label>
+              <div
+                style={{ display: "flex", gap: "8px", marginBottom: "15px" }}
+              >
+                <button
+                  onClick={() => setCarCondition("ปกติ")}
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    borderRadius: "20px",
+                    border: "1px solid #ddd",
+                    fontSize: "10px",
+                    cursor: "pointer",
+                    background: carCondition === "ปกติ" ? "#f0f4f8" : "white",
+                    color: carCondition === "ปกติ" ? "#003366" : "#666",
+                    fontWeight: carCondition === "ปกติ" ? "bold" : "normal",
+                  }}
+                >
+                  ปกติ (ไม่มีรอยขีดข่วน)
+                </button>
+                <button
+                  onClick={() => setCarCondition("พบรอยขีดข่วน")}
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    borderRadius: "20px",
+                    border: "1px solid #ddd",
+                    fontSize: "10px",
+                    cursor: "pointer",
+                    background:
+                      carCondition === "พบรอยขีดข่วน" ? "#f0f4f8" : "white",
+                    color: carCondition === "พบรอยขีดข่วน" ? "#003366" : "#666",
+                    fontWeight:
+                      carCondition === "พบรอยขีดข่วน" ? "bold" : "normal",
+                  }}
+                >
+                  พบรอยขีดข่วน/ความเสียหาย
+                </button>
+              </div>
+
+              {/* 🎯 บล็อกพิมพ์บันทึกรายละเอียด (ห้ามขยับได้) */}
+              <textarea
+                placeholder="บันทึกรายละเอียด..."
+                value={staffNote}
+                onChange={(e) => setStaffNote(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: "80px",
+                  borderRadius: "10px",
+                  border: "1px solid #ddd",
+                  padding: "10px",
+                  boxSizing: "border-box",
+                  fontSize: "13px",
+                  fontFamily: "Kanit",
+                  resize: "none", // 👈 ตรึงกล่อง ห้ามขยายขนาด
+                }}
+              ></textarea>
+
+              {/* 🎯 ส่วนปุ่มกดล่างสุด (มีปุ่มยกเลิกเล็กกว่าตกลง) */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  marginTop: "15px",
+                  alignItems: "center",
+                }}
+              >
+                {/* ปุ่มยกเลิก (เล็กกว่า) */}
+                <button
+                  onClick={() => setShowInspectionModal(null)}
+                  style={{
+                    padding: "8px 20px", // ขนาดเล็กกว่า
+                    background: "#f5f5f5",
+                    color: "#666",
+                    border: "none",
+                    borderRadius: "20px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                  }}
+                >
+                  ยกเลิก
+                </button>
+
+                {/* ปุ่มตกลง (ใหญ่เด่น) */}
+                <button
+                  onClick={async () => {
+                    // 🚀 ส่งข้อมูลโน้ตและสภาพรถแนบไปกับสถานะ in_progress
+                    await updateStatus(
+                      showInspectionModal.booking_id,
+                      "in_progress",
+                      {
+                        car_condition: carCondition, // ปกติ หรือ พบรอยขีดข่วน
+                        staff_note: staffNote, // ข้อความที่พนักงานพิมพ์
+                      },
+                    );
+
+                    setShowInspectionModal(null);
+                  }}
+                  className="btn-sm"
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    background: "#A5F3D0",
+                    color: "#065F46",
+                    borderRadius: "30px",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  ตกลง
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* STEP 3: Popup ยืนยันการล้างเสร็จ */}
+        {/* 🔵 STEP 3: Popup ล้างรถเสร็จสิ้น */}
+        {showCompleteModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              fontFamily: "Kanit",
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                padding: "30px",
+                borderRadius: "20px",
+                width: "90%",
+                maxWidth: "350px",
+                textAlign: "center",
+              }}
+            >
+              {/* ไอคอนวงกลมถูกสีฟ้า */}
+              <div
+                style={{
+                  width: "80px",
+                  height: "80px",
+                  backgroundColor: "#dbeafe",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px",
+                }}
+              >
+                <span style={{ color: "#2563eb", fontSize: "40px" }}>✔</span>
+              </div>
+
+              <h3
+                style={{
+                  color: "#FF5722",
+                  marginBottom: "10px",
+                  fontSize: "18px",
+                }}
+              >
+                STEP 3 : ล้างรถเสร็จสิ้น
+              </h3>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#333",
+                  marginBottom: "5px",
+                  fontWeight: "bold",
+                }}
+              >
+                ต้องการยืนยันการทำรายการใช่หรือไม่?
+              </p>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "#999",
+                  marginBottom: "25px",
+                }}
+              >
+                การยืนยันนี้จะส่งรถไปยังจุดรอชำระเงิน
+              </p>
+
+              <div style={{ display: "flex", gap: "15px" }}>
+                {/* ปุ่มยกเลิก */}
+                <button
+                  onClick={() => setShowCompleteModal(null)}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "#eeeeee",
+                    color: "#666",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                  }}
+                >
+                  ยกเลิก
+                </button>
+
+                {/* ปุ่มตกลงสีฟ้า */}
+                <button
+                  onClick={async () => {
+                    await updateStatus(
+                      showCompleteModal.booking_id,
+                      "completed",
+                    ); // ยิงสถานะไปรอชำระเงิน
+                    setShowCompleteModal(null); // ปิด Popup
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "#a5b4fc",
+                    color: "#3730a3",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                  }}
+                >
+                  ตกลง
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* 🟢 STEP 4: Popup ชำระเงิน */}
+        {showPaymentModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              fontFamily: "Kanit",
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                padding: "30px",
+                borderRadius: "20px",
+                width: "90%",
+                maxWidth: "380px",
+                textAlign: "left",
+              }}
+            >
+              {/* Header: USERNAME | JOB ID */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "15px",
+                }}
+              >
+                <span
+                  style={{
+                    backgroundColor: "#e60000",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {showPaymentModal.customer_name || "USERNAME"}
+                </span>
+                <span style={{ color: "#999", fontSize: "12px" }}>
+                  JOB ID : {showPaymentModal.booking_id}
+                </span>
+              </div>
+
+              {/* ข้อมูลรถ */}
+              <div
+                style={{
+                  backgroundColor: "#f5f5f5",
+                  padding: "10px 15px",
+                  borderRadius: "12px",
+                  fontSize: "13px",
+                  marginBottom: "20px",
+                }}
+              >
+                <div>
+                  🚗 {showPaymentModal.vehicle.brand}{" "}
+                  {showPaymentModal.vehicle.model}
+                </div>
+                <div style={{ marginTop: "5px" }}>
+                  ⏰ ลูกค้าเข้า :{" "}
+                  {formatTime(showPaymentModal.booking_datetime)} น.
+                </div>
+              </div>
+
+              {/* ยอดชำระ (ตอนนี้จำลองค่า 300 THB ไว้ก่อน เพราะ API ฝั่ง Backend ยังไม่ส่งราคาแยกมาให้ครับ) */}
+              <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#666",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ยอดชำระทั้งหมด
+                </p>
+                <h2
+                  style={{
+                    margin: "5px 0 0 0",
+                    color: "#0F9D58",
+                    fontSize: "36px",
+                    fontWeight: "800",
+                  }}
+                >
+                  300 THB
+                </h2>
+              </div>
+
+              {/* ช่องทางชำระเงิน (กดแล้วกรอบแดงเปลี่ยน) */}
+              <p
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  marginBottom: "10px",
+                }}
+              >
+                ช่องทางชำระเงิน
+              </p>
+              <div
+                style={{ display: "flex", gap: "10px", marginBottom: "25px" }}
+              >
+                <div
+                  onClick={() => setPaymentMethod("cash")}
+                  style={{
+                    flex: 1,
+                    border:
+                      paymentMethod === "cash"
+                        ? "2px solid #ff0000"
+                        : "2px dashed #ccc",
+                    borderRadius: "10px",
+                    padding: "15px 5px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    color: paymentMethod === "cash" ? "#ff0000" : "#666",
+                  }}
+                >
+                  <div style={{ fontSize: "24px", marginBottom: "5px" }}>
+                    💵
+                  </div>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>
+                    เงินสด
+                  </div>
+                </div>
+                <div
+                  onClick={() => setPaymentMethod("transfer")}
+                  style={{
+                    flex: 1,
+                    border:
+                      paymentMethod === "transfer"
+                        ? "2px solid #ff0000"
+                        : "2px dashed #ccc",
+                    borderRadius: "10px",
+                    padding: "15px 5px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    color: paymentMethod === "transfer" ? "#ff0000" : "#666",
+                  }}
+                >
+                  <div style={{ fontSize: "24px", marginBottom: "5px" }}>
+                    🏦
+                  </div>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>
+                    โอนเงิน
+                  </div>
+                </div>
+                <div
+                  onClick={() => setPaymentMethod("credit")}
+                  style={{
+                    flex: 1,
+                    border:
+                      paymentMethod === "credit"
+                        ? "2px solid #ff0000"
+                        : "2px dashed #ccc",
+                    borderRadius: "10px",
+                    padding: "15px 5px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    color: paymentMethod === "credit" ? "#ff0000" : "#666",
+                  }}
+                >
+                  <div style={{ fontSize: "24px", marginBottom: "5px" }}>
+                    💳
+                  </div>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>
+                    บัตรเครดิต
+                  </div>
+                </div>
+              </div>
+
+              {/* ปุ่มกด */}
+              <div
+                style={{ display: "flex", gap: "10px", alignItems: "center" }}
+              >
+                <button
+                  onClick={() => setShowPaymentModal(null)}
+                  style={{
+                    padding: "8px 20px",
+                    background: "#f5f5f5",
+                    color: "#666",
+                    border: "none",
+                    borderRadius: "20px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={() => handlePayment(showPaymentModal.booking_id)}
+                  className="btn-sm"
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    background: "#A5F3D0",
+                    color: "#065F46",
+                    borderRadius: "30px",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  ยืนยันชำระเงิน
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
