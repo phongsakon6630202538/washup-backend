@@ -25,15 +25,13 @@ const BookingPage = () => {
         const result = await response.json();
         
         if (response.ok) {
-          // แก้จุดนี้: API ของคุณส่งมาในรูปแบบ { data: [รถ1, รถ2] }
           const vehicleData = result.data || result; 
           
-          if (Array.isArray(vehicleData)) {
+          if (Array.isArray(vehicleData) && vehicleData.length > 0) {
             setVehicles(vehicleData);
-            if (vehicleData.length > 0) {
-              // เลือก ID แรกให้โดยอัตโนมัติ (รองรับทั้ง _id และ vehicle_id)
-              setSelectedVehicleId(vehicleData[0]._id || vehicleData[0].vehicle_id);
-            }
+            // แก้ไข: ดึง vehicle_id มาเป็นค่าเริ่มต้น (เพราะใน DB ใช้ฟิลด์นี้เป็น Number)
+            const initialId = vehicleData[0].vehicle_id || vehicleData[0]._id;
+            setSelectedVehicleId(initialId.toString());
           }
         }
       } catch (error) {
@@ -47,53 +45,70 @@ const BookingPage = () => {
 
   // --- ฟังก์ชันบันทึกการจอง ---
   const handleBooking = async () => {
-    if (!selectedVehicleId || !selectedService || !selectedTime) {
-      alert('กรุณาเลือกข้อมูลให้ครบถ้วน');
-      return;
-    }
+  const vId = Number(selectedVehicleId);
 
-    const mainService = mainServices.find(s => s.id === selectedService);
-    const addonsTotal = selectedAddons.reduce((acc, id) => acc + (addons.find(a => a.id === id)?.price || 0), 0);
-    const totalPrice = (mainService?.price || 0) + addonsTotal;
+  if (!selectedVehicleId || isNaN(vId) || !selectedService || !selectedTime) {
+    alert('กรุณาเลือกข้อมูลให้ครบถ้วน');
+    return;
+  }
 
-    // แก้ไขตรงนี้: ให้หาจากทั้ง _id และ vehicle_id เพื่อความแม่นยำ
-    const selectedCar = vehicles.find(v => (v._id === selectedVehicleId || v.vehicle_id === selectedVehicleId));
+  // ✅ FIX เดือน (รองรับวันที่ 01 เป็นเดือนถัดไป)
+  let month = 3;
+  if (selectedDate === '01') {
+    month = 4;
+  }
 
-    const bookingData = {
-      vehicle_id: selectedCar?.vehicle_id,
-      service_details: {
-        main_service: mainService?.name,
-        addons: selectedAddons.map(id => addons.find(a => a.id === id)?.name),
-      },
-      appointment_date: `2024-03-${selectedDate}`, // ตัวอย่างวันที่
-      appointment_time: selectedTime,
-      total_price: totalPrice,
-    };
+  // ✅ FIX timezone ไทย (กันเวลาเพี้ยนจาก toISOString)
+  const [hour, minute] = selectedTime.split(':').map(Number);
 
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(bookingData)
-      });
+  const localDate = new Date(
+    2026,
+    month - 1,
+    Number(selectedDate),
+    hour,
+    minute,
+    0
+  );
 
-      if (response.ok) {
-        alert('จองบริการสำเร็จ!');
-        navigate('/status'); // หรือหน้าติดตามสถานะ
-      } else {
-        const err = await response.json();
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      }
-    } catch (error) {
-      console.error("Booking error:", error);
-      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
-    }
+  const bookingDateTime = new Date(
+    localDate.getTime() - localDate.getTimezoneOffset() * 60000
+  ).toISOString();
+
+  // ✅ Payload ตรง backend
+  const bookingData = {
+    vehicle_id: vId,
+    booking_datetime: bookingDateTime,
+    main_service: selectedService,
+    extra_services: selectedAddons,
   };
 
+  console.log("Sending Payload to match API:", bookingData);
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:3000/api/bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(bookingData)
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert('จองบริการสำเร็จ!');
+      navigate('/status');
+    } else {
+      console.error("Server Error Detail:", result);
+      alert('จองไม่สำเร็จ: ' + (result.message || 'ตรวจสอบข้อมูลอีกครั้ง'));
+    }
+  } catch (error) {
+    console.error(error);
+    alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+  }
+};
   const mainServices = [
     { id: 'std', name: 'ล้างสี - ดูดฝุ่น (STANDARD WASH)', desc: 'ล้างทำความสะอาดภายนอกและภายในรถเบื้องต้น เช็ดแห้ง ทำความสะอาดกระจก ดูดฝุ่นพื้นรถและพรม และเช็ดแผงหน้าปัด', price: 150 },
     { id: 'prm', name: 'ล้างสี - ดูดฝุ่น + เคลือบแว็กซ์ (PREMIUM WASH)', desc: 'บริการแบบ STANDARD WASH พร้อมเพิ่มการลงแว็กซ์เคลือบสีรถ เพื่อความเงางามและปกป้องสีจากมลภาวะ และป้องกันคราบน้ำเกาะ', price: 300 },
@@ -252,7 +267,7 @@ const BookingPage = () => {
         ) : vehicles.length > 0 ? (
           <div className="car-list">
             {vehicles.map(car => {
-              const carId = car._id || car.vehicle_id; // รองรับทั้งสองแบบ
+              const carId = (car.vehicle_id || car._id).toString();
               return (
                 <div
                   key={carId}
