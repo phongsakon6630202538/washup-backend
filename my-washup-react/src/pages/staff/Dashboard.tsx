@@ -98,23 +98,23 @@ export default function StaffDashboard() {
 
   const handlePayment = async (bookingId: number) => {
     const token = localStorage.getItem("token");
-
     try {
       const response = await fetch("http://localhost:3000/api/payments", {
+        // 🎯 เติม s และ /
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          booking_id: bookingId,
+          booking_id: bookingId, // 🎯 ส่ง ID ไปให้ Backend หาข้อมูล
           payment_method: paymentMethod,
-        }), // ส่งข้อมูลไปบันทึก
+        }),
       });
 
       const data = await response.json();
 
-      if (response.ok || data.message === "booking already paid") {
+      if (response.ok || data.message === "ชำระเงินแล้ว") {
         // ✅ เคล็ดลับให้หายไปเลย: ใช้ setJobs กรอง (Filter) รถคันนี้ทิ้งออกจากหน้าจอทันที
         setJobs((prevJobs) =>
           prevJobs.filter((job) => job.booking_id !== bookingId),
@@ -269,12 +269,10 @@ export default function StaffDashboard() {
               <div>
                 <i className="fas fa-tint"></i> กำลังล้าง
               </div>
-              <div className="col-count">
-                {getJobs("in_progress").length} คัน
-              </div>
+              <div className="col-count">{getJobs("washing").length} คัน</div>
             </div>
             <div className="col-body-dashed">
-              {getJobs("in_progress").map((job) => (
+              {getJobs("washing").map((job) => (
                 <div key={job.booking_id} className="job-card-og border-blue">
                   <div className="card-top">
                     <span className="card-user">
@@ -675,10 +673,10 @@ export default function StaffDashboard() {
                     // 🚀 ส่งข้อมูลโน้ตและสภาพรถแนบไปกับสถานะ in_progress
                     await updateStatus(
                       showInspectionModal.booking_id,
-                      "in_progress",
+                      "washing",
                       {
-                        car_condition: carCondition, // ปกติ หรือ พบรอยขีดข่วน
-                        staff_note: staffNote, // ข้อความที่พนักงานพิมพ์
+                        checkin_note: carCondition, // 💡 แอบเห็นหลังบ้านเพื่อนใช้คำว่า checkin_note แทน car_condition นะครับ
+                        staff_note: staffNote,
                       },
                     );
 

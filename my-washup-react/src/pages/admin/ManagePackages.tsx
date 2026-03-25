@@ -2,89 +2,108 @@ import React, { useState, useEffect } from "react";
 import "./ManagePackages.css";
 
 export default function ManagePackages() {
-  // เริ่มต้นเป็น Array ว่างๆ รอรับจาก Backend
   const [packages, setPackages] = useState<any[]>([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    _id: "",
-    name: "",
+    service_id: "",
+    service_name: "",
     description: "",
     price: 0,
-  }); // ใช้ _id ตาม MongoDB
+  });
 
-  // 1. 🟢 ฟังก์ชันดึงข้อมูลแพ็คเกจทั้งหมด (GET)
+  // 1. 🟢 ดึงข้อมูลแพ็คเกจ (ใช้เส้นทาง Admin และส่ง Token)
   const fetchPackages = async () => {
+    const token = localStorage.getItem("token");
     try {
-      // รอแก้ URL เป็นของเพื่อน
-      const res = await fetch("http://localhost:3000/api/packages");
-      const data = await res.json();
-      setPackages(data);
+      const res = await fetch("http://localhost:3000/api/services/admin", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPackages(data);
+      }
     } catch (err) {
       console.error("ดึงข้อมูลแพ็คเกจล้มเหลว:", err);
     }
   };
 
-  // ดึงข้อมูลทันทีที่เปิดหน้านี้
   useEffect(() => {
     fetchPackages();
   }, []);
 
   const handleAddNew = () => {
     setEditMode(false);
-    setFormData({ _id: "", name: "", description: "", price: 0 });
+    setFormData({
+      service_id: "",
+      service_name: "",
+      description: "",
+      price: 0,
+    });
     setIsModalOpen(true);
   };
 
   const handleEdit = (pkg: any) => {
     setEditMode(true);
-    setFormData(pkg);
+    setFormData({
+      service_id: pkg.service_id,
+      service_name: pkg.service_name,
+      description: pkg.description,
+      price: pkg.price,
+    });
     setIsModalOpen(true);
   };
 
-  // 2. 🔴 ฟังก์ชันลบแพ็คเกจ (DELETE)
-  const handleDelete = async (id: string) => {
+  // 2. 🔴 ลบแพ็คเกจ (ยิงไปที่ /api/services/:id)
+  const handleDelete = async (id: string | number) => {
     if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบแพ็คเกจนี้?")) {
+      const token = localStorage.getItem("token");
       try {
-        await fetch(`http://localhost:3000/api/packages/${id}`, {
+        const res = await fetch(`http://localhost:3000/api/services/${id}`, {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
-        fetchPackages(); // ลบเสร็จ สั่งดึงข้อมูลใหม่ให้ตารางอัปเดต
+        if (res.ok) fetchPackages();
       } catch (err) {
         console.error("ลบไม่สำเร็จ:", err);
       }
     }
   };
 
-  // 3. 🟡/🔵 ฟังก์ชันบันทึกข้อมูล (POST = เพิ่มใหม่, PUT = แก้ไข)
+  // 3. 🟡/🔵 บันทึกข้อมูล (POST/PUT ไปที่ /api/services)
   const handleSave = async () => {
+    const token = localStorage.getItem("token");
+    const url = editMode
+      ? `http://localhost:3000/api/services/${formData.service_id}`
+      : "http://localhost:3000/api/services";
+
     try {
-      if (editMode) {
-        // อัปเดตของเดิม (PUT)
-        await fetch(`http://localhost:3000/api/packages/${formData._id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: formData.name,
-            description: formData.description,
-            price: formData.price,
-          }),
-        });
+      const res = await fetch(url, {
+        method: editMode ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          service_name: formData.service_name,
+          description: formData.description,
+          price: formData.price,
+          is_active: true,
+          type: "main",
+        }),
+      });
+
+      if (res.ok) {
+        fetchPackages();
+        setIsModalOpen(false);
       } else {
-        // เพิ่มของใหม่ (POST)
-        await fetch("http://localhost:3000/api/packages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: formData.name,
-            description: formData.description,
-            price: formData.price,
-          }),
-        });
+        const errData = await res.json();
+        alert("Error: " + errData.message);
       }
-      fetchPackages(); // เซฟเสร็จ ดึงข้อมูลใหม่
-      setIsModalOpen(false); // ปิด Popup
     } catch (err) {
       console.error("บันทึกไม่สำเร็จ:", err);
     }
@@ -92,20 +111,16 @@ export default function ManagePackages() {
 
   return (
     <div className="package-container">
-      {/* Header Section ... (เหมือนเดิมเลยครับ) */}
       <div className="package-header">
         <div className="package-title">
           <h2>Manage Service Packages</h2>
-          <p>
-            Define and edit your car wash service pricing tiers by vehicle size.
-          </p>
+          <p>Define and edit your car wash service pricing tiers.</p>
         </div>
         <button className="btn-add" onClick={handleAddNew}>
           + Add New Package
         </button>
       </div>
 
-      {/* Table Section */}
       <div className="package-table-wrapper">
         <table className="package-table">
           <thead>
@@ -118,10 +133,8 @@ export default function ManagePackages() {
           </thead>
           <tbody>
             {packages.map((pkg) => (
-              <tr key={pkg._id}>
-                {" "}
-                {/* ใช้ _id ของ MongoDB */}
-                <td style={{ fontWeight: "bold" }}>{pkg.name}</td>
+              <tr key={pkg.service_id}>
+                <td style={{ fontWeight: "bold" }}>{pkg.service_name}</td>
                 <td>{pkg.description}</td>
                 <td style={{ fontWeight: "bold" }}>
                   {pkg.price.toLocaleString()}.-
@@ -137,10 +150,9 @@ export default function ManagePackages() {
                     >
                       📝
                     </button>
-                    {/* ส่ง _id ไปลบ */}
                     <button
                       className="btn-delete"
-                      onClick={() => handleDelete(pkg._id)}
+                      onClick={() => handleDelete(pkg.service_id)}
                     >
                       🗑️
                     </button>
@@ -154,43 +166,35 @@ export default function ManagePackages() {
 
       <div className="table-footer">
         <span>Showing {packages.length} Active Packages</span>
-        <span>
-          © 2026 WASH UP Management Console. All pricing inclusive of local tax.
-        </span>
       </div>
 
-      {/* Modal Popup (เหมือนเดิมเลยครับ โค้ดไม่เปลี่ยน) */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h3>{editMode ? "แก้ไขแพ็คเกจ" : "เพิ่มแพ็คเกจใหม่"}</h3>
-
             <div className="form-group">
-              <label>ชื่อแพ็คเกจ (Service Name)</label>
+              <label>ชื่อแพ็คเกจ</label>
               <input
                 type="text"
-                value={formData.name}
+                value={formData.service_name}
                 onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
+                  setFormData({ ...formData, service_name: e.target.value })
                 }
                 placeholder="เช่น ล้างสี-ดูดฝุ่น"
               />
             </div>
-
             <div className="form-group">
-              <label>รายละเอียด (Description)</label>
+              <label>รายละเอียด</label>
               <textarea
                 rows={3}
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                placeholder="อธิบายรายละเอียดการล้าง..."
               ></textarea>
             </div>
-
             <div className="form-group">
-              <label>ราคา (Price)</label>
+              <label>ราคา</label>
               <input
                 type="number"
                 value={formData.price}
@@ -199,7 +203,6 @@ export default function ManagePackages() {
                 }
               />
             </div>
-
             <div className="modal-actions">
               <button
                 className="btn-cancel"

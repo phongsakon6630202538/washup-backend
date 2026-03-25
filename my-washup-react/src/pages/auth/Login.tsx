@@ -29,6 +29,7 @@ export default function Login() {
         localStorage.setItem("token", data.token);
 
         localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("userName", data.user.fullname);
         // เช็คสิทธิ์ด้วยคำว่า user_role
         if (data.user.user_role === "admin") {
           navigate("/admin"); // ถ้าเป็นเจ้าของ เด้งไปหน้ากราฟรายได้

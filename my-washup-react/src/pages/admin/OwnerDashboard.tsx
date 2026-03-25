@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,7 +11,7 @@ import {
 import "./OwnerDashboard.css";
 
 export default function OwnerDashboard() {
-  // 1. สร้าง State มารอรับข้อมูลจาก Backend
+  // 1. State รอรับข้อมูล
   const [stats, setStats] = useState({
     dailyRevenue: 0,
     completedWashes: 0,
@@ -23,9 +21,9 @@ export default function OwnerDashboard() {
   const [chartData, setChartData] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
-  // 2. ฟังก์ชันไปดึงข้อมูลจากเพื่อน (Backend)
+  // 2. ฟังก์ชันดึงข้อมูลจาก Backend
   const fetchOwnerData = async () => {
-    const token = localStorage.getItem("token"); // ดึง Token ถ้ามีระบบ Login
+    const token = localStorage.getItem("token");
 
     try {
       const response = await fetch(
@@ -37,26 +35,31 @@ export default function OwnerDashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        // เอาข้อมูลที่เพื่อนส่งมา ยัดใส่ State ของเรา
-        setStats(data.stats);
-        setChartData(data.chartData);
-        setRecentTransactions(data.recentTransactions);
+
+        // 🎯 แมปปิ้งข้อมูลให้ตรงกับที่เพื่อนส่งมา (แก้ปัญหาชื่อไม่ตรง)
+        setStats({
+          dailyRevenue: data.stats.dailyRevenue || 0,
+          completedWashes: data.stats.completed || 0, // หลังบ้านชื่อ completed
+          cancelled: data.stats.cancelled || 0,
+          popularPackage: data.stats.popularPackage || "-",
+        });
+
+        setChartData(data.chart || []); // หลังบ้านส่งมาชื่อ chart
+        setRecentTransactions(data.recentTransactions || []);
       }
     } catch (err) {
       console.error("ดึงข้อมูล Dashboard ไม่สำเร็จ:", err);
     }
   };
 
-  // 3. สั่งให้ดึงข้อมูลทันทีที่เปิดหน้านี้
   useEffect(() => {
     fetchOwnerData();
   }, []);
 
   return (
     <div className="owner-bg">
-      {/* Content */}
       <div className="owner-content">
-        {/* 4 Cards ด้านบน (เปลี่ยนมาใช้ตัวแปรจาก Backend แล้ว) */}
+        {/* ----- 4 Cards สรุปยอด ----- */}
         <div className="stats-grid">
           <div className="stat-card red-border">
             <div className="stat-title">Daily Revenue</div>
@@ -96,7 +99,7 @@ export default function OwnerDashboard() {
           </div>
         </div>
 
-        {/* กราฟ */}
+        {/* ----- กราฟ ----- */}
         <div className="chart-section">
           <div className="section-header">
             <div>
@@ -104,10 +107,6 @@ export default function OwnerDashboard() {
               <p className="section-subtitle">
                 Performance visualization for the current week
               </p>
-            </div>
-            <div className="chart-actions">
-              <button>Export CSV</button>
-              <button>Print Report</button>
             </div>
           </div>
           <div style={{ width: "100%", height: 300 }}>
@@ -154,7 +153,7 @@ export default function OwnerDashboard() {
           </div>
         </div>
 
-        {/* ตารางข้อมูลล่าสุด */}
+        {/* ----- ตารางข้อมูลล่าสุด ----- */}
         <div className="table-section">
           <div className="section-header">
             <h2 className="section-title">Recent Transactions</h2>
@@ -168,18 +167,19 @@ export default function OwnerDashboard() {
                 <th>License Plate</th>
                 <th>Package</th>
                 <th>Amount</th>
-                <th>Staff</th>
+                <th>Customer</th>
               </tr>
             </thead>
             <tbody>
               {recentTransactions.map((tx, index) => (
                 <tr key={index}>
+                  {/* 🎯 เปลี่ยนชื่อตัวแปรให้ตรงกับ backend */}
                   <td>{tx.datetime}</td>
-                  <td className="text-red">{tx.id}</td>
-                  <td className="fw-bold">{tx.plate}</td>
-                  <td>{tx.package}</td>
-                  <td className="fw-bold">{tx.amount}</td>
-                  <td>{tx.staff}</td>
+                  <td className="text-red">{tx.booking_id}</td>
+                  <td className="fw-bold">{tx.vehicle}</td>
+                  <td>{tx.service}</td>
+                  <td className="fw-bold">{tx.total}</td>
+                  <td>{tx.customer}</td>
                 </tr>
               ))}
             </tbody>

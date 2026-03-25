@@ -9,9 +9,10 @@ export default function AdminLayout() {
 
   // 🟢 ดึงชื่อจากกระเป๋า (localStorage) ทันทีที่เปิดหน้านี้
   useEffect(() => {
-    const storedName = localStorage.getItem("userName");
-    if (storedName) {
-      setUserName(storedName); // เอาชื่อมาตั้งค่า
+    const storedUser = localStorage.getItem("user"); // ดึงข้อมูล user ทั้งก้อน
+    if (storedUser) {
+      const userObj = JSON.parse(storedUser);
+      setUserName(userObj.fullname); // ดึง fullname มาแสดง
     }
   }, []);
 

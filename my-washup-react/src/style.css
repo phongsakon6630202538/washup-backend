@@ -8,6 +8,25 @@ body {
   background-color: #fff;
 }
 
+/* 🚀 ยันต์ปลดล็อคหน้าจอ - บังคับให้ Scroll ได้ทุกสถานการณ์ */
+html,
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto !important; /* ยอมให้ความสูงยืดตามเนื้อหา */
+  min-height: 100vh !important;
+  overflow-y: auto !important; /* เปิดให้เลื่อนแนวตั้งได้เสมอ */
+  overflow-x: hidden !important; /* กันจอส่ายซ้ายขวา */
+  display: block !important;
+}
+
+#root {
+  display: block !important;
+  min-height: 100vh !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
 /* Hero Section */
 .hero {
   display: flex;
