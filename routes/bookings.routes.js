@@ -171,7 +171,8 @@ router.post("/", authMiddleware, async (req, res) => {
     res.json({
       message: "booking created",
       booking_id,
-      total_price
+      total_price,
+      refresh_slots: true
     });
 
   } catch (err) {
