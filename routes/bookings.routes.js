@@ -144,6 +144,7 @@ router.post("/", authMiddleware, async (req, res) => {
         booking_id,
         service_id: s,
         price_at_booking: service.price
+
       });
     }
 
@@ -171,7 +172,8 @@ router.post("/", authMiddleware, async (req, res) => {
     res.json({
       message: "booking created",
       booking_id,
-      total_price
+      total_price,
+      refresh_slots: true
     });
 
   } catch (err) {
