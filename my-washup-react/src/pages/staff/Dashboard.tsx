@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "./dashboard.css";
 
 interface Booking {
@@ -6,12 +7,13 @@ interface Booking {
   booking_datetime: string;
   status: string;
   customer_name?: string;
-  vehicle: {
-    brand: string;
-    model: string;
-    license_plate: string;
-  };
+  payment_status: string;
+  vehicle_brand?: string;
+  vehicle_model?: string;
+  vehicle_plate?: string;
+
   services?: string[];
+  total_price?: number;
 }
 export default function StaffDashboard() {
   const [jobs, setJobs] = useState<Booking[]>([]);
@@ -35,6 +37,22 @@ export default function StaffDashboard() {
 
   // 2. เก็บช่องทางชำระเงิน (cash, transfer, credit)
   const [paymentMethod, setPaymentMethod] = useState("cash");
+
+  const [cashReceived, setCashReceived] = useState<number | string>("");
+  const [change, setChange] = useState<number>(0);
+  const navigate = useNavigate();
+  const [showReceipt, setShowReceipt] = useState<any>(null);
+  // 🎯 เพิ่ม useEffect นี้เพื่อคำนวณเงินทอนอัตโนมัติ
+  useEffect(() => {
+    if (showPaymentModal && paymentMethod === "cash") {
+      const total = showPaymentModal.total_price || 300;
+      if (Number(cashReceived) >= total) {
+        setChange(Number(cashReceived) - total);
+      } else {
+        setChange(0);
+      }
+    }
+  }, [cashReceived, paymentMethod, showPaymentModal]);
 
   const fetchBookings = () => {
     const token = localStorage.getItem("token");
@@ -97,17 +115,24 @@ export default function StaffDashboard() {
   };
 
   const handlePayment = async (bookingId: number) => {
+    // 🛑 1. ดักเช็คเงิน (เหมือนเดิม)
+    const total = showPaymentModal?.total_price || 300;
+
+    if (paymentMethod === "cash" && Number(cashReceived) < total) {
+      alert("รับเงินมาไม่ครบยอดชำระ กรุณาตรวจสอบอีกครั้ง!");
+      return;
+    }
+
     const token = localStorage.getItem("token");
     try {
       const response = await fetch("http://localhost:3000/api/payments", {
-        // 🎯 เติม s และ /
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          booking_id: bookingId, // 🎯 ส่ง ID ไปให้ Backend หาข้อมูล
+          booking_id: bookingId,
           payment_method: paymentMethod,
         }),
       });
@@ -115,12 +140,25 @@ export default function StaffDashboard() {
       const data = await response.json();
 
       if (response.ok || data.message === "ชำระเงินแล้ว") {
-        // ✅ เคล็ดลับให้หายไปเลย: ใช้ setJobs กรอง (Filter) รถคันนี้ทิ้งออกจากหน้าจอทันที
+        // เซตข้อมูลใส่ Popup ใบเสร็จ (แทนการเด้งหน้าใหม่)
+        setShowReceipt({
+          booking: showPaymentModal,
+          paymentId: data.payment_id || bookingId,
+          details: {
+            method: paymentMethod,
+            received: cashReceived,
+            change: change,
+            total: total,
+          },
+        });
+
+        // ✅ 4. เคลียร์ข้อมูลหน้า Dashboard
         setJobs((prevJobs) =>
           prevJobs.filter((job) => job.booking_id !== bookingId),
         );
-        setShowPaymentModal(null); // ปิด Popup
-        alert("บันทึกการชำระเงินสำเร็จ!");
+        setShowPaymentModal(null);
+        setCashReceived("");
+        setChange(0); // รีเซ็ตเงินทอน
       } else {
         alert("Error: " + data.message);
       }
@@ -129,7 +167,8 @@ export default function StaffDashboard() {
     }
   };
   // ฟังก์ชันตัวช่วยดึงข้อมูลตาม Status ของ Backend
-  const getJobs = (status: string) => jobs.filter((j) => j.status === status);
+  const getJobs = (status: string) =>
+    jobs.filter((j) => j.status === status && j.payment_status !== "paid");
 
   // ฟังก์ชันตัวช่วยจัดรูปแบบเวลา
   const formatTime = (isoString: string) => {
@@ -165,11 +204,10 @@ export default function StaffDashboard() {
                   </div>
                   <div className="card-car-info">
                     <div className="car-model">
-                      {job.vehicle?.brand || "ไม่ระบุ"}{" "}
-                      {job.vehicle?.model || ""}
+                      {job.vehicle_brand || "ไม่ระบุ"} {job.vehicle_model || ""}
                     </div>
                     <div className="car-license">
-                      ทะเบียน: {job.vehicle?.license_plate || "ไม่ระบุ"}
+                      ทะเบียน: {job.vehicle_plate || "ไม่ระบุ"}
                     </div>
                   </div>
                   <div className="card-services">
@@ -223,11 +261,10 @@ export default function StaffDashboard() {
                   </div>
                   <div className="card-car-info">
                     <div className="car-model">
-                      {job.vehicle?.brand || "ไม่ระบุ"}{" "}
-                      {job.vehicle?.model || ""}
+                      {job.vehicle_brand || "ไม่ระบุ"} {job.vehicle_model || ""}
                     </div>
                     <div className="car-license">
-                      ทะเบียน: {job.vehicle?.license_plate || "ไม่ระบุ"}
+                      ทะเบียน: {job.vehicle_plate || "ไม่ระบุ"}
                     </div>
                   </div>
                   <div className="card-services">
@@ -284,11 +321,10 @@ export default function StaffDashboard() {
                   </div>
                   <div className="card-car-info">
                     <div className="car-model">
-                      {job.vehicle?.brand || "ไม่ระบุ"}{" "}
-                      {job.vehicle?.model || ""}
+                      {job.vehicle_brand || "ไม่ระบุ"} {job.vehicle_model || ""}
                     </div>
                     <div className="car-license">
-                      ทะเบียน: {job.vehicle?.license_plate || "ไม่ระบุ"}
+                      ทะเบียน: {job.vehicle_plate || "ไม่ระบุ"}
                     </div>
                   </div>
                   <div className="card-services">
@@ -340,11 +376,10 @@ export default function StaffDashboard() {
                   </div>
                   <div className="card-car-info">
                     <div className="car-model">
-                      {job.vehicle?.brand || "ไม่ระบุ"}{" "}
-                      {job.vehicle?.model || ""}
+                      {job.vehicle_brand || "ไม่ระบุ"} {job.vehicle_model || ""}
                     </div>
                     <div className="car-license">
-                      ทะเบียน: {job.vehicle?.license_plate || "ไม่ระบุ"}
+                      ทะเบียน: {job.vehicle_plate || "ไม่ระบุ"}
                     </div>
                   </div>
                   <div className="card-services">
@@ -561,8 +596,8 @@ export default function StaffDashboard() {
                 }}
               >
                 <div>
-                  🚗 {showInspectionModal.vehicle?.brand || "ไม่ระบุ"}{" "}
-                  {showInspectionModal.vehicle?.model || ""}
+                  🚗 {showInspectionModal.vehicle_brand || "ไม่ระบุ"}{" "}
+                  {showInspectionModal.vehicle_model || ""}
                 </div>
                 <div style={{ marginTop: "5px" }}>
                   ⏰ ลูกค้าเข้า :{" "}
@@ -878,8 +913,8 @@ export default function StaffDashboard() {
                 }}
               >
                 <div>
-                  🚗 {showPaymentModal.vehicle?.brand || "ไม่ระบุ"}{" "}
-                  {showPaymentModal.vehicle?.model || ""}
+                  🚗 {showPaymentModal.vehicle_brand || "ไม่ระบุ"}{" "}
+                  {showPaymentModal.vehicle_model || ""}
                 </div>
                 <div style={{ marginTop: "5px" }}>
                   ⏰ ลูกค้าเข้า :{" "}
@@ -1029,6 +1064,498 @@ export default function StaffDashboard() {
                   ยืนยันชำระเงิน
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* 🟢 STEP 4: Popup ชำระเงิน (อัปเดตใหม่ตรงตาม Figma) */}
+        {showPaymentModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              fontFamily: "Kanit, sans-serif",
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                padding: "24px",
+                borderRadius: "12px",
+                width: "90%",
+                maxWidth: "400px",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+              }}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderBottom: "1px solid #eee",
+                  paddingBottom: "12px",
+                  marginBottom: "20px",
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <span style={{ color: "#E63946", fontSize: "18px" }}>💵</span>
+                  <h3 style={{ margin: 0, fontSize: "16px", color: "#1D3557" }}>
+                    ชำระเงินและจบงาน
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowPaymentModal(null)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "24px",
+                    color: "#999",
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* รายละเอียดการจอง */}
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  marginBottom: "20px",
+                }}
+              >
+                <p
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "13px",
+                    margin: "8px 0",
+                  }}
+                >
+                  <span style={{ color: "#666" }}>Booking ID</span>
+                  <strong>#{showPaymentModal.booking_id}</strong>
+                </p>
+                <p
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "13px",
+                    margin: "8px 0",
+                  }}
+                >
+                  <span style={{ color: "#666" }}>Vehicle</span>
+                  <strong>
+                    🚘 {showPaymentModal.vehicle_brand || "ไม่ระบุ"}{" "}
+                    {showPaymentModal.vehicle_model || ""} (
+                    {showPaymentModal.vehicle_plate || "-"})
+                  </strong>
+                </p>
+              </div>
+
+              {/* ยอดชำระ */}
+              <div style={{ textAlign: "center", marginBottom: "25px" }}>
+                <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
+                  ยอดชำระทั้งหมด
+                </p>
+                <h1
+                  style={{
+                    margin: "5px 0",
+                    fontSize: "36px",
+                    color: "#E63946",
+                    fontWeight: "900",
+                  }}
+                >
+                  {showPaymentModal.total_price || 300}{" "}
+                  <span style={{ fontSize: "20px" }}>THB</span>
+                </h1>
+              </div>
+
+              {/* ช่องทางการชำระเงิน */}
+              <div style={{ marginBottom: "20px" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    marginBottom: "8px",
+                  }}
+                >
+                  ช่องทางการชำระเงิน
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    onClick={() => setPaymentMethod("cash")}
+                    style={{
+                      border:
+                        paymentMethod === "cash"
+                          ? "2px solid #E63946"
+                          : "1px solid #ddd",
+                      background: paymentMethod === "cash" ? "#fff5f5" : "#fff",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      position: "relative",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>💵</span>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        color: paymentMethod === "cash" ? "#E63946" : "#666",
+                      }}
+                    >
+                      เงินสด
+                    </span>
+                    {paymentMethod === "cash" && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "5px",
+                          right: "5px",
+                          background: "#E63946",
+                          color: "white",
+                          borderRadius: "50%",
+                          width: "16px",
+                          height: "16px",
+                          fontSize: "10px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        ✔
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    onClick={() => setPaymentMethod("transfer")}
+                    style={{
+                      border:
+                        paymentMethod === "transfer"
+                          ? "2px solid #E63946"
+                          : "1px solid #ddd",
+                      background:
+                        paymentMethod === "transfer" ? "#fff5f5" : "#fff",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      position: "relative",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>🏦</span>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        color:
+                          paymentMethod === "transfer" ? "#E63946" : "#666",
+                      }}
+                    >
+                      โอนเงิน
+                    </span>
+                    {paymentMethod === "transfer" && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "5px",
+                          right: "5px",
+                          background: "#E63946",
+                          color: "white",
+                          borderRadius: "50%",
+                          width: "16px",
+                          height: "16px",
+                          fontSize: "10px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        ✔
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    onClick={() => setPaymentMethod("credit")}
+                    style={{
+                      border:
+                        paymentMethod === "credit"
+                          ? "2px solid #E63946"
+                          : "1px solid #ddd",
+                      background:
+                        paymentMethod === "credit" ? "#fff5f5" : "#fff",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      position: "relative",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>💳</span>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        color: paymentMethod === "credit" ? "#E63946" : "#666",
+                      }}
+                    >
+                      บัตรเครดิต
+                    </span>
+                    {paymentMethod === "credit" && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "5px",
+                          right: "5px",
+                          background: "#E63946",
+                          color: "white",
+                          borderRadius: "50%",
+                          width: "16px",
+                          height: "16px",
+                          fontSize: "10px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        ✔
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ส่วนรับเงิน/เงินทอน (แสดงเฉพาะเงินสด) */}
+              {paymentMethod === "cash" && (
+                <div
+                  style={{
+                    background: "#f0f4f8",
+                    padding: "16px",
+                    borderRadius: "8px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      display: "block",
+                      marginBottom: "8px",
+                      color: "#1D3557",
+                    }}
+                  >
+                    รับเงินมา (Cash Received)
+                  </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      background: "white",
+                      border: "1px solid #ddd",
+                      borderRadius: "6px",
+                      padding: "8px 12px",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    <input
+                      type="number"
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(e.target.value)}
+                      style={{
+                        flex: 1,
+                        border: "none",
+                        outline: "none",
+                        fontSize: "16px",
+                        fontFamily: "Kanit",
+                      }}
+                      placeholder="0"
+                    />
+                    <span style={{ color: "#aaa", fontSize: "12px" }}>THB</span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ fontSize: "14px", color: "#666" }}>
+                      เงินทอน (Change)
+                    </span>
+                    <strong style={{ fontSize: "20px", color: "#1D3557" }}>
+                      {change} THB
+                    </strong>
+                  </div>
+                </div>
+              )}
+
+              {/* ปุ่ม Action */}
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => setShowPaymentModal(null)}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    background: "white",
+                    border: "1px solid #ddd",
+                    borderRadius: "8px",
+                    color: "#666",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={() => handlePayment(showPaymentModal.booking_id)}
+                  style={{
+                    flex: 2,
+                    padding: "12px",
+                    background: "#E63946",
+                    border: "none",
+                    borderRadius: "8px",
+                    color: "white",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  ✔ ยืนยันชำระเงินและจบงาน
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* 🧾 Popup ใบเสร็จ (ต้องวางไว้ล่างสุดตรงนี้!) */}
+        {showReceipt && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 2000,
+              fontFamily: "Kanit",
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                width: "100%",
+                maxWidth: "400px",
+                borderRadius: "16px",
+                padding: "30px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: "60px",
+                  height: "60px",
+                  background: "#E8F5E9",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 15px",
+                }}
+              >
+                <span style={{ color: "#4CAF50", fontSize: "30px" }}>✔</span>
+              </div>
+              <h2 style={{ margin: "0 0 5px 0", color: "#2E7D32" }}>
+                ชำระเงินสำเร็จ
+              </h2>
+              <p style={{ color: "#888", fontSize: "12px" }}>
+                #RC-{showReceipt.paymentId}
+              </p>
+
+              <div
+                style={{
+                  textAlign: "left",
+                  margin: "20px 0",
+                  borderTop: "1px dashed #eee",
+                  paddingTop: "15px",
+                }}
+              >
+                <p
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "14px",
+                  }}
+                >
+                  <span>ทะเบียนรถ:</span>{" "}
+                  <strong>{showReceipt.booking?.vehicle_plate || "-"}</strong>
+                </p>
+                <p
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "14px",
+                  }}
+                >
+                  <span>ยอดชำระ:</span>{" "}
+                  <strong style={{ color: "#E63946" }}>
+                    {showReceipt.details?.total || 300} THB
+                  </strong>
+                </p>
+                {showReceipt.details?.method === "cash" && (
+                  <p
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "14px",
+                      color: "#666",
+                    }}
+                  >
+                    <span>เงินทอน:</span>{" "}
+                    <strong>{showReceipt.details?.change || 0} THB</strong>
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowReceipt(null)}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  background: "#1D3557",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                ปิดหน้าต่าง
+              </button>
             </div>
           </div>
         )}
