@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePDF } from "react-to-pdf";
 import "./dashboard.css";
 
 interface Booking {
@@ -15,6 +16,343 @@ interface Booking {
   services?: string[];
   total_price?: number;
 }
+
+// ตัวแปร receiptRef จะถูกนำไปผูกกับ Div หลักเพื่อจับภาพไปทำ PDF ครับ
+const FormalReceiptHTML = ({
+  showReceipt,
+  receiptRef,
+}: {
+  showReceipt: any;
+  receiptRef: any;
+}) => {
+  if (!showReceipt) return null;
+
+  // จัดรูปแบบวันที่ (พ.ศ.)
+  const today = new Date();
+  const formattedDate = `${today.getDate()} ${today.toLocaleString("th-TH", { month: "short" })} ${today.getFullYear() + 543}`;
+
+  // ดึงข้อมูลบริการ (Services) มาจัดรูปแบบสำหรับตาราง
+  // ในที่นี้สมมติว่าบริการหลักคือรายการแรกครับ
+  const mainService =
+    showReceipt.booking?.services && showReceipt.booking.services[0]
+      ? showReceipt.booking.services[0]
+      : "Premium Wash & Wax";
+
+  return (
+    // 🎯 1. ตัวหลักที่ผูกกับ Ref เพื่อจับภาพ
+    <div ref={receiptRef} style={pdfStyles.container}>
+      {/* 🎯 2. Header (โลโก้ + RECEIPT) */}
+      <div style={pdfStyles.header}>
+        <div style={pdfStyles.logoArea}>
+          {/* อย่าลืมเปลี่ยน path โลโก้ให้ตรงนะครับ */}
+          <img
+            src="/image/logowashup.png"
+            alt="WASH UP Logo"
+            style={pdfStyles.logo}
+          />
+        </div>
+        <h1 style={pdfStyles.title}>RECEIPT</h1>
+      </div>
+      {/* 🎯 3. ข้อมูลการทำรายการ */}
+      <div style={pdfStyles.infoGrid}>
+        <div style={pdfStyles.infoCol}>
+          <p>
+            <span style={pdfStyles.label}>Receipt #:</span> #RC-
+            {showReceipt.paymentId || "0000"}
+          </p>
+          <p>
+            <span style={pdfStyles.label}>Date:</span> {formattedDate}
+          </p>
+        </div>
+        <div style={pdfStyles.infoCol}>
+          <p>
+            <span style={pdfStyles.label}>Customer Name:</span>{" "}
+            {showReceipt.booking?.customer_name || "Guest"}
+          </p>
+          <p>
+            <span style={pdfStyles.label}>Vehicle:</span>{" "}
+            {showReceipt.booking?.vehicle_plate || "-"}
+          </p>
+        </div>
+      </div>
+      {/* 🎯 4. ตารางรายการ */}
+      <table style={pdfStyles.table}>
+        <thead>
+          <tr style={pdfStyles.tableHeaderRow}>
+            <th style={{ ...pdfStyles.tableHeaderCell, width: "10%" }}>SR.#</th>
+            <th style={{ ...pdfStyles.tableHeaderCell, width: "50%" }}>
+              DESCRIPTION
+            </th>
+            <th
+              style={{
+                ...pdfStyles.tableHeaderCell,
+                width: "10%",
+                textAlign: "center" as const, // 🎯 เติม as const ตรงนี้
+              }}
+            >
+              QTY
+            </th>
+            <th
+              style={{
+                ...pdfStyles.tableHeaderCell,
+                width: "15%",
+                textAlign: "right" as const, // 🎯 เติม as const ตรงนี้
+              }}
+            >
+              PRICE (THB)
+            </th>
+            <th
+              style={{
+                ...pdfStyles.tableHeaderCell,
+                width: "15%",
+                textAlign: "right" as const, // 🎯 เติม as const ตรงนี้
+              }}
+            >
+              AMOUNT (THB)
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style={pdfStyles.tableBodyRow}>
+            <td style={pdfStyles.tableBodyCell}>1</td>
+            <td style={pdfStyles.tableBodyCell}>
+              WASH UP Wash Service
+              <br />({mainService})
+            </td>
+            <td
+              style={{
+                ...pdfStyles.tableBodyCell,
+                textAlign: "center" as const,
+              }}
+            >
+              1
+            </td>
+            <td
+              style={{
+                ...pdfStyles.tableBodyCell,
+                textAlign: "right" as const,
+              }}
+            >
+              {showReceipt.details?.total || 300} THB
+            </td>
+            <td
+              style={{
+                ...pdfStyles.tableBodyCell,
+                textAlign: "right" as const,
+              }}
+            >
+              {showReceipt.details?.total || 300} THB
+            </td>
+          </tr>
+          {/* คุณตูนสามารถ map รายการ services อื่นๆ ลงตรงนี้ได้ตามต้องการครับ */}
+        </tbody>
+      </table>
+      {/* 🎯 5. ส่วนสรุปยอด */}
+      <div style={pdfStyles.totalsArea}>
+        <div style={pdfStyles.totalsGrid}>
+          <div
+            style={{ ...pdfStyles.totalsLabels, textAlign: "right" as const }}
+          >
+            <p style={pdfStyles.totalSubLabel}>SUBTOTAL:</p>
+            <p style={pdfStyles.totalSubLabel}>VAT (7%):</p>
+            <p style={pdfStyles.totalMainLabel}>TOTAL:</p>
+          </div>
+          <div
+            style={{ ...pdfStyles.totalsValues, textAlign: "right" as const }}
+          >
+            <p style={pdfStyles.totalSubValue}>
+              {showReceipt.details?.total || 300} THB
+            </p>
+            <p style={pdfStyles.totalSubValue}>0 THB</p>
+            <p style={pdfStyles.totalMainValue}>
+              {showReceipt.details?.total || 300} THB
+            </p>
+          </div>
+        </div>
+      </div>{" "}
+      {/* 🎯 เติมปิด div ตัวที่หายไปครับ */}
+      {/* 🎯 6. รายละเอียดการชำระ */}
+      <div style={pdfStyles.paymentInfo}>
+        <div style={pdfStyles.paymentGrid}>
+          <div>
+            <p
+              style={{ ...pdfStyles.totalSubLabel, textTransform: "uppercase" }}
+            >
+              {showReceipt.details?.method || "Cash"} RECEIVED:
+            </p>
+            <p style={pdfStyles.totalSubLabel}>CHANGE:</p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <p style={pdfStyles.totalSubValue}>
+              {showReceipt.details?.received || showReceipt.details?.total} THB
+            </p>
+            <p style={pdfStyles.totalSubValue}>
+              {showReceipt.details?.change || 0} THB
+            </p>
+          </div>
+        </div>
+      </div>
+      {/* 🎯 7. Footer */}
+      <div style={pdfStyles.footer}>
+        <div style={pdfStyles.signatureLine}></div>
+        <p style={{ textAlign: "center", marginTop: "10px", fontSize: "14px" }}>
+          Authorized Signature
+        </p>
+        <div
+          style={{
+            ...pdfStyles.dashedSeparator,
+            marginTop: "30px",
+            marginBottom: "10px",
+          }}
+        ></div>
+        <p style={{ textAlign: "center", color: "#888", fontSize: "12px" }}>
+          THANK YOU FOR USING WASH UP SERVICE
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// 🎨 Styles สำหรับ PDF (inline เพื่อให้แสดงผล PDF แม่นยำที่สุด)
+const pdfStyles: { [key: string]: React.CSSProperties } = {
+  container: {
+    padding: "60px",
+    backgroundColor: "white",
+    fontFamily: "Kanit, sans-serif",
+    boxSizing: "border-box",
+    width: "100%",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "40px",
+    borderBottom: "2px dashed #eee",
+    paddingBottom: "20px",
+  },
+  logoArea: {
+    display: "flex",
+    alignItems: "center",
+  },
+  logo: {
+    width: "120px",
+    height: "auto",
+  },
+  title: {
+    margin: 0,
+    fontSize: "40px",
+    color: "#1D3557", // สีแดงตามรูปที่ 1 เพื่อคุมโทน แต่แบบเป็นทางการ
+    fontWeight: "900",
+    letterSpacing: "2px",
+  },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "30px",
+    marginBottom: "40px",
+  },
+  infoCol: {
+    fontSize: "14px",
+    color: "#333",
+  },
+  label: {
+    fontWeight: "bold",
+    color: "#1D3557",
+    display: "inline-block",
+    width: "130px",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse" as "collapse",
+    marginBottom: "40px",
+  },
+  tableHeaderRow: {
+    backgroundColor: "#1D3557", // สีแดงทางการ
+    color: "white",
+  },
+  tableHeaderCell: {
+    padding: "12px",
+    fontSize: "14px",
+    fontWeight: "bold",
+    textAlign: "left",
+
+    textTransform: "uppercase" as "uppercase",
+  },
+  tableBodyRow: {
+    borderBottom: "1px dashed #eee",
+  },
+  tableBodyCell: {
+    padding: "15px 12px",
+    fontSize: "13px",
+    color: "#333",
+    lineHeight: "1.4",
+  },
+  dashedSeparator: {
+    borderTop: "2px dashed #eee",
+    margin: "20px 0",
+  },
+  totalsArea: {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginBottom: "30px",
+  },
+  totalsGrid: {
+    display: "flex",
+    width: "300px",
+  },
+  totalsLabels: {
+    flex: 1,
+    textAlign: "right",
+  },
+  totalsValues: {
+    flex: 1,
+    textAlign: "right",
+    paddingLeft: "20px",
+  },
+  totalSubLabel: {
+    fontSize: "13px",
+    color: "#666",
+    margin: "5px 0",
+  },
+  totalSubValue: {
+    fontSize: "13px",
+    fontWeight: "bold",
+    color: "#333",
+    margin: "5px 0",
+  },
+  totalMainLabel: {
+    fontSize: "16px",
+    fontWeight: "bold",
+    color: "#1D3557",
+    margin: "15px 0",
+  },
+  totalMainValue: {
+    fontSize: "24px",
+    fontWeight: "900",
+    color: "#E63946",
+    margin: "10px 0",
+  },
+  paymentInfo: {
+    display: "flex",
+    justifyContent: "flex-end",
+    color: "#888",
+  },
+  paymentGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 100px",
+    gap: "20px",
+    width: "300px",
+  },
+  footer: {
+    marginTop: "60px",
+  },
+  signatureLine: {
+    width: "200px",
+    borderBottom: "1px solid #aaa",
+    margin: "0 auto",
+  },
+};
+
 export default function StaffDashboard() {
   const [jobs, setJobs] = useState<Booking[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState<Booking | null>(
@@ -42,6 +380,9 @@ export default function StaffDashboard() {
   const [change, setChange] = useState<number>(0);
   const navigate = useNavigate();
   const [showReceipt, setShowReceipt] = useState<any>(null);
+  const { toPDF, targetRef } = usePDF({
+    filename: `WASHUP-Receipt-${showReceipt?.booking_id || "0000"}.pdf`,
+  });
   // 🎯 เพิ่ม useEffect นี้เพื่อคำนวณเงินทอนอัตโนมัติ
   useEffect(() => {
     if (showPaymentModal && paymentMethod === "cash") {
@@ -942,7 +1283,8 @@ export default function StaffDashboard() {
                     fontWeight: "800",
                   }}
                 >
-                  300 THB
+                  {showPaymentModal.total_price || 300} THB{" "}
+                  {/* ✅ เปลี่ยนให้ดึงค่าจริงมาโชว์ครับ */}
                 </h2>
               </div>
 
@@ -1027,6 +1369,71 @@ export default function StaffDashboard() {
                 </div>
               </div>
 
+              {paymentMethod === "cash" && (
+                <div
+                  style={{
+                    background: "#f0f4f8",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      display: "block",
+                      marginBottom: "8px",
+                      color: "#1D3557",
+                    }}
+                  >
+                    รับเงินมา (Cash Received)
+                  </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      background: "white",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                      padding: "8px 12px",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    <input
+                      type="number"
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(e.target.value)} // 🚀 ลิงก์ค่าเข้า State เพื่อคำนวณเงินทอน
+                      style={{
+                        flex: 1,
+                        border: "none",
+                        outline: "none",
+                        fontSize: "18px",
+                        fontWeight: "bold",
+                        fontFamily: "Kanit",
+                      }}
+                      placeholder="0"
+                    />
+                    <span style={{ color: "#aaa", fontSize: "12px" }}>THB</span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ fontSize: "14px", color: "#666" }}>
+                      เงินทอน (Change)
+                    </span>
+                    <strong style={{ fontSize: "20px", color: "#1D3557" }}>
+                      {change} THB
+                    </strong>
+                  </div>
+                </div>
+              )}
+
               {/* ปุ่มกด */}
               <div
                 style={{ display: "flex", gap: "10px", alignItems: "center" }}
@@ -1068,496 +1475,159 @@ export default function StaffDashboard() {
           </div>
         )}
         {/* 🟢 STEP 4: Popup ชำระเงิน (อัปเดตใหม่ตรงตาม Figma) */}
-        {showPaymentModal && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1000,
-              fontFamily: "Kanit, sans-serif",
-            }}
-          >
-            <div
-              style={{
-                background: "white",
-                padding: "24px",
-                borderRadius: "12px",
-                width: "90%",
-                maxWidth: "400px",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-              }}
-            >
-              {/* Header */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderBottom: "1px solid #eee",
-                  paddingBottom: "12px",
-                  marginBottom: "20px",
-                }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  <span style={{ color: "#E63946", fontSize: "18px" }}>💵</span>
-                  <h3 style={{ margin: 0, fontSize: "16px", color: "#1D3557" }}>
-                    ชำระเงินและจบงาน
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowPaymentModal(null)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    fontSize: "24px",
-                    color: "#999",
-                    cursor: "pointer",
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-
-              {/* รายละเอียดการจอง */}
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  marginBottom: "20px",
-                }}
-              >
-                <p
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "13px",
-                    margin: "8px 0",
-                  }}
-                >
-                  <span style={{ color: "#666" }}>Booking ID</span>
-                  <strong>#{showPaymentModal.booking_id}</strong>
-                </p>
-                <p
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "13px",
-                    margin: "8px 0",
-                  }}
-                >
-                  <span style={{ color: "#666" }}>Vehicle</span>
-                  <strong>
-                    🚘 {showPaymentModal.vehicle_brand || "ไม่ระบุ"}{" "}
-                    {showPaymentModal.vehicle_model || ""} (
-                    {showPaymentModal.vehicle_plate || "-"})
-                  </strong>
-                </p>
-              </div>
-
-              {/* ยอดชำระ */}
-              <div style={{ textAlign: "center", marginBottom: "25px" }}>
-                <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
-                  ยอดชำระทั้งหมด
-                </p>
-                <h1
-                  style={{
-                    margin: "5px 0",
-                    fontSize: "36px",
-                    color: "#E63946",
-                    fontWeight: "900",
-                  }}
-                >
-                  {showPaymentModal.total_price || 300}{" "}
-                  <span style={{ fontSize: "20px" }}>THB</span>
-                </h1>
-              </div>
-
-              {/* ช่องทางการชำระเงิน */}
-              <div style={{ marginBottom: "20px" }}>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: "bold",
-                    marginBottom: "8px",
-                  }}
-                >
-                  ช่องทางการชำระเงิน
-                </p>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr 1fr",
-                    gap: "10px",
-                  }}
-                >
-                  <div
-                    onClick={() => setPaymentMethod("cash")}
-                    style={{
-                      border:
-                        paymentMethod === "cash"
-                          ? "2px solid #E63946"
-                          : "1px solid #ddd",
-                      background: paymentMethod === "cash" ? "#fff5f5" : "#fff",
-                      borderRadius: "8px",
-                      padding: "12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "8px",
-                      cursor: "pointer",
-                      position: "relative",
-                    }}
-                  >
-                    <span style={{ fontSize: "20px" }}>💵</span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                        color: paymentMethod === "cash" ? "#E63946" : "#666",
-                      }}
-                    >
-                      เงินสด
-                    </span>
-                    {paymentMethod === "cash" && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "5px",
-                          right: "5px",
-                          background: "#E63946",
-                          color: "white",
-                          borderRadius: "50%",
-                          width: "16px",
-                          height: "16px",
-                          fontSize: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        ✔
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    onClick={() => setPaymentMethod("transfer")}
-                    style={{
-                      border:
-                        paymentMethod === "transfer"
-                          ? "2px solid #E63946"
-                          : "1px solid #ddd",
-                      background:
-                        paymentMethod === "transfer" ? "#fff5f5" : "#fff",
-                      borderRadius: "8px",
-                      padding: "12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "8px",
-                      cursor: "pointer",
-                      position: "relative",
-                    }}
-                  >
-                    <span style={{ fontSize: "20px" }}>🏦</span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                        color:
-                          paymentMethod === "transfer" ? "#E63946" : "#666",
-                      }}
-                    >
-                      โอนเงิน
-                    </span>
-                    {paymentMethod === "transfer" && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "5px",
-                          right: "5px",
-                          background: "#E63946",
-                          color: "white",
-                          borderRadius: "50%",
-                          width: "16px",
-                          height: "16px",
-                          fontSize: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        ✔
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    onClick={() => setPaymentMethod("credit")}
-                    style={{
-                      border:
-                        paymentMethod === "credit"
-                          ? "2px solid #E63946"
-                          : "1px solid #ddd",
-                      background:
-                        paymentMethod === "credit" ? "#fff5f5" : "#fff",
-                      borderRadius: "8px",
-                      padding: "12px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "8px",
-                      cursor: "pointer",
-                      position: "relative",
-                    }}
-                  >
-                    <span style={{ fontSize: "20px" }}>💳</span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                        color: paymentMethod === "credit" ? "#E63946" : "#666",
-                      }}
-                    >
-                      บัตรเครดิต
-                    </span>
-                    {paymentMethod === "credit" && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "5px",
-                          right: "5px",
-                          background: "#E63946",
-                          color: "white",
-                          borderRadius: "50%",
-                          width: "16px",
-                          height: "16px",
-                          fontSize: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        ✔
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* ส่วนรับเงิน/เงินทอน (แสดงเฉพาะเงินสด) */}
-              {paymentMethod === "cash" && (
-                <div
-                  style={{
-                    background: "#f0f4f8",
-                    padding: "16px",
-                    borderRadius: "8px",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#1D3557",
-                    }}
-                  >
-                    รับเงินมา (Cash Received)
-                  </label>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      background: "white",
-                      border: "1px solid #ddd",
-                      borderRadius: "6px",
-                      padding: "8px 12px",
-                      marginBottom: "15px",
-                    }}
-                  >
-                    <input
-                      type="number"
-                      value={cashReceived}
-                      onChange={(e) => setCashReceived(e.target.value)}
-                      style={{
-                        flex: 1,
-                        border: "none",
-                        outline: "none",
-                        fontSize: "16px",
-                        fontFamily: "Kanit",
-                      }}
-                      placeholder="0"
-                    />
-                    <span style={{ color: "#aaa", fontSize: "12px" }}>THB</span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span style={{ fontSize: "14px", color: "#666" }}>
-                      เงินทอน (Change)
-                    </span>
-                    <strong style={{ fontSize: "20px", color: "#1D3557" }}>
-                      {change} THB
-                    </strong>
-                  </div>
-                </div>
-              )}
-
-              {/* ปุ่ม Action */}
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  onClick={() => setShowPaymentModal(null)}
-                  style={{
-                    flex: 1,
-                    padding: "12px",
-                    background: "white",
-                    border: "1px solid #ddd",
-                    borderRadius: "8px",
-                    color: "#666",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                  }}
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  onClick={() => handlePayment(showPaymentModal.booking_id)}
-                  style={{
-                    flex: 2,
-                    padding: "12px",
-                    background: "#E63946",
-                    border: "none",
-                    borderRadius: "8px",
-                    color: "white",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                  }}
-                >
-                  ✔ ยืนยันชำระเงินและจบงาน
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* 🧾 Popup ใบเสร็จ (ต้องวางไว้ล่างสุดตรงนี้!) */}
+        {/* 🟢 ส่วนของใบเสร็จ (แสดงเมื่อชำระสำเร็จ) */}
         {showReceipt && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              backgroundColor: "rgba(0,0,0,0.8)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 2000,
-              fontFamily: "Kanit",
-            }}
-          >
+          <>
+            {/* 🎯 1. Popup แบบเดิมที่โชว์หน้าจอ (รูปที่ 1) */}
+            {/* อันนี้โชว์สวยๆ กระชับๆ เหมือนเดิมครับคุณตูน */}
             <div
               style={{
-                background: "white",
-                width: "100%",
-                maxWidth: "400px",
-                borderRadius: "16px",
-                padding: "30px",
-                textAlign: "center",
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0,0,0,0.8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 2000,
+                fontFamily: "Kanit, sans-serif",
               }}
             >
               <div
                 style={{
-                  width: "60px",
-                  height: "60px",
-                  background: "#E8F5E9",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 15px",
+                  background: "white",
+                  width: "100%",
+                  maxWidth: "400px",
+                  borderRadius: "16px",
+                  padding: "30px",
+                  textAlign: "center",
+                  boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
                 }}
               >
-                <span style={{ color: "#4CAF50", fontSize: "30px" }}>✔</span>
-              </div>
-              <h2 style={{ margin: "0 0 5px 0", color: "#2E7D32" }}>
-                ชำระเงินสำเร็จ
-              </h2>
-              <p style={{ color: "#888", fontSize: "12px" }}>
-                #RC-{showReceipt.paymentId}
-              </p>
+                <div
+                  style={{
+                    width: "60px",
+                    height: "60px",
+                    background: "#E8F5E9",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 15px",
+                  }}
+                >
+                  <span style={{ color: "#4CAF50", fontSize: "30px" }}>✔</span>
+                </div>
+                <h2 style={{ margin: "0 0 5px 0", color: "#2E7D32" }}>
+                  ชำระเงินสำเร็จ
+                </h2>
+                <p style={{ color: "#888", fontSize: "12px" }}>
+                  #RC-{showReceipt.paymentId || showReceipt.booking_id}
+                </p>
 
-              <div
-                style={{
-                  textAlign: "left",
-                  margin: "20px 0",
-                  borderTop: "1px dashed #eee",
-                  paddingTop: "15px",
-                }}
-              >
-                <p
+                <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "14px",
+                    textAlign: "left",
+                    margin: "20px 0",
+                    borderTop: "1px dashed #eee",
+                    paddingTop: "15px",
                   }}
                 >
-                  <span>ทะเบียนรถ:</span>{" "}
-                  <strong>{showReceipt.booking?.vehicle_plate || "-"}</strong>
-                </p>
-                <p
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "14px",
-                  }}
-                >
-                  <span>ยอดชำระ:</span>{" "}
-                  <strong style={{ color: "#E63946" }}>
-                    {showReceipt.details?.total || 300} THB
-                  </strong>
-                </p>
-                {showReceipt.details?.method === "cash" && (
                   <p
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       fontSize: "14px",
-                      color: "#666",
+                      margin: "10px 0",
                     }}
                   >
-                    <span>เงินทอน:</span>{" "}
-                    <strong>{showReceipt.details?.change || 0} THB</strong>
+                    <span style={{ color: "#666" }}>ทะเบียนรถ:</span>{" "}
+                    <strong>{showReceipt.booking?.vehicle_plate || "-"}</strong>
                   </p>
-                )}
-              </div>
+                  <p
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "14px",
+                      margin: "10px 0",
+                    }}
+                  >
+                    <span style={{ color: "#666" }}>ยอดชำระสุทธิ:</span>{" "}
+                    <strong style={{ color: "#E63946" }}>
+                      {showReceipt.details?.total || 300} THB
+                    </strong>
+                  </p>
+                  {showReceipt.details?.method === "cash" && (
+                    <p
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "14px",
+                        color: "#666",
+                      }}
+                    >
+                      <span>เงินทอน:</span>{" "}
+                      <strong style={{ color: "#1D3557" }}>
+                        {showReceipt.details?.change || 0} THB
+                      </strong>
+                    </p>
+                  )}
+                </div>
 
-              <button
-                onClick={() => setShowReceipt(null)}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  background: "#1D3557",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                ปิดหน้าต่าง
-              </button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  {/* 🎯 ปุ่มปริ้น: สั่งให้ไปจับภาพอันที่ซ่อนอยู่ทำ PDF */}
+                  <button
+                    onClick={() => toPDF()} // 🚀 เรียก PDF ตัวทางการที่ซ่อนอยู่
+                    style={{
+                      flex: 1,
+                      padding: "12px",
+                      background: "white",
+                      border: "1px solid #1D3557",
+                      borderRadius: "8px",
+                      color: "#1D3557",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      fontFamily: "Kanit",
+                    }}
+                  >
+                    📄 พิมพ์ใบเสร็จ (PDF)
+                  </button>
+                  <button
+                    onClick={() => setShowReceipt(null)}
+                    style={{
+                      flex: 1,
+                      padding: "12px",
+                      background: "#1D3557",
+                      border: "none",
+                      borderRadius: "8px",
+                      color: "white",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      fontFamily: "Kanit",
+                    }}
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+
+            {/* 🎯 2. Popup แบบทางการที่ซ่อนอยู่ (รูปที่ 2) */}
+            {/* อันนี้เอาไว้จับภาพไปทำ PDF ครับ เราจะสั่งซ่อนไม่ให้เห็นหน้าจอ */}
+            <div
+              style={{
+                position: "absolute", // ย้ายออกนอกหน้าจอ
+                top: "-10000px",
+                left: "-10000px",
+                width: "100%", // เผื่อความกว้างไว้ให้จับภาพแม่นๆ
+                opacity: 0, // ซ่อนไว้
+              }}
+            >
+              <FormalReceiptHTML
+                showReceipt={showReceipt}
+                receiptRef={targetRef}
+              />
+            </div>
+          </>
         )}
       </div>
     </>
