@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Car, Clock, RotateCcw, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Car, Clock, RotateCcw, CheckCircle2 } from "lucide-react";
 
 interface Booking {
   booking_id: number;
@@ -20,27 +20,33 @@ const HistoryPage = () => {
   // ✅ Mapping status ให้ตรงกับ Logic ของรูปภาพ
   const mapStatus = (status: string) => {
     switch (status) {
-      case "pending": return "pending";
-      case "confirmed": return "confirmed";
-      case "washing": return "in_progress";
-      case "completed": return "ready";
-      case "cancelled": return "cancelled";
-      default: return status;
+      case "pending":
+        return "pending";
+      case "confirmed":
+        return "confirmed";
+      case "washing":
+        return "in_progress";
+      case "completed":
+        return "ready";
+      case "cancelled":
+        return "cancelled";
+      default:
+        return status;
     }
   };
 
   const fetchHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/bookings/user', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3000/api/bookings/user", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
 
       if (response.ok) {
         const mapped = data.map((b: any) => ({
           ...b,
-          ui_status: mapStatus(b.status)
+          ui_status: mapStatus(b.status),
         }));
         setBookings(mapped);
       }
@@ -59,19 +65,27 @@ const HistoryPage = () => {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'long' }) + 
-           ' – ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString("th-TH", { day: "numeric", month: "long" }) +
+      " – " +
+      date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
+    );
   };
 
-  const activeBookings = bookings.filter(b => 
-    ['pending','confirmed','in_progress'].includes(b.ui_status || '')
+  const activeBookings = bookings.filter((b) =>
+    ["pending", "confirmed", "in_progress"].includes(b.ui_status || ""),
   );
 
-  const pastBookings = bookings.filter(b => 
-    ['ready', 'cancelled'].includes(b.ui_status || '')
+  const pastBookings = bookings.filter((b) =>
+    ["ready", "cancelled"].includes(b.ui_status || ""),
   );
 
-  if (loading) return <div style={{ padding: '50px', textAlign: 'center' }}>กำลังโหลดข้อมูล...</div>;
+  if (loading)
+    return (
+      <div style={{ padding: "50px", textAlign: "center" }}>
+        กำลังโหลดข้อมูล...
+      </div>
+    );
 
   return (
     <div className="history-page">
@@ -125,72 +139,106 @@ const HistoryPage = () => {
         <p>ติดตามและจัดการบริการล้างรถระดับพรีเมียมของคุณ</p>
       </div>
 
-      <div className="section-title">
-        <RotateCcw size={20} /> กำลังดำเนินการอยู่ <div className="line-deco"></div>
-      </div>
-
-      {activeBookings.length > 0 ? activeBookings.map(item => (
-        <div key={item.booking_id} className="booking-card">
-          <div className="card-top">
-            <div className="booking-info">
-              <div className="id">หมายเลขการจองที่ #{item.booking_id}</div>
-              <div className="date">{formatDate(item.booking_datetime)}</div>
-            </div>
-            <div className="price-tag">{item.total_price} THB</div>
+      {activeBookings.length > 0 ? (
+        <>
+          <div className="section-title">
+            <RotateCcw size={20} /> กำลังดำเนินการอยู่{" "}
+            <div className="line-deco"></div>
           </div>
 
-          <div className="car-detail-box">
-            <div className="car-icon-circle"><Car size={28} /></div>
-            <div className="info-grid">
-              <span className="label">ยี่ห้อรถ</span> <span className="value">: {item.vehicle_brand}</span>
-              <span className="label">รุ่นรถ</span> <span className="value">: {item.vehicle_model}</span>
-              <span className="label">ทะเบียนรถ</span> <span className="value">: {item.vehicle_plate}</span>
-            </div>
-          </div>
+          {activeBookings.map((item) => (
+            <div key={item.booking_id} className="booking-card">
+              <div className="card-top">
+                <div className="booking-info">
+                  <div className="id">หมายเลขการจองที่ #{item.booking_id}</div>
+                  <div className="date">
+                    {formatDate(item.booking_datetime)}
+                  </div>
+                </div>
+                <div className="price-tag">{item.total_price} THB</div>
+              </div>
 
-          <div className="stepper">
-            <div className={`step ${['pending','confirmed','in_progress','ready'].includes(item.ui_status || '') ? 'active' : ''}`}>
-              <div className="circle"><Clock size={16} /></div>
-              <span className="step-text">Pending</span>
-            </div>
-            <div className={`step ${['confirmed','in_progress','ready'].includes(item.ui_status || '') ? 'active' : ''}`}>
-              <div className="circle"><CheckCircle2 size={16} /></div>
-              <span className="step-text">Confirmed</span>
-            </div>
-            <div className={`step ${['in_progress','ready'].includes(item.ui_status || '') ? 'active' : ''}`}>
-              <div className="circle"><Car size={16} /></div>
-              <span className="step-text">In Progress</span>
-            </div>
-            <div className={`step ${item.ui_status === 'ready' ? 'active' : ''}`}>
-              <div className="circle"><CheckCircle2 size={16} /></div>
-              <span className="step-text">Ready</span>
-            </div>
-          </div>
+              <div className="car-detail-box">
+                <div className="car-icon-circle">
+                  <Car size={28} />
+                </div>
+                <div className="info-grid">
+                  <span className="label">ยี่ห้อรถ</span>{" "}
+                  <span className="value">: {item.vehicle_brand}</span>
+                  <span className="label">รุ่นรถ</span>{" "}
+                  <span className="value">: {item.vehicle_model}</span>
+                  <span className="label">ทะเบียนรถ</span>{" "}
+                  <span className="value">: {item.vehicle_plate}</span>
+                </div>
+              </div>
 
-          
+              <div className="stepper">
+                <div
+                  className={`step ${["pending", "confirmed", "in_progress", "ready"].includes(item.ui_status || "") ? "active" : ""}`}
+                >
+                  <div className="circle">
+                    <Clock size={16} />
+                  </div>
+                  <span className="step-text">Pending</span>
+                </div>
+                <div
+                  className={`step ${["confirmed", "in_progress", "ready"].includes(item.ui_status || "") ? "active" : ""}`}
+                >
+                  <div className="circle">
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <span className="step-text">Confirmed</span>
+                </div>
+                <div
+                  className={`step ${["in_progress", "ready"].includes(item.ui_status || "") ? "active" : ""}`}
+                >
+                  <div className="circle">
+                    <Car size={16} />
+                  </div>
+                  <span className="step-text">In Progress</span>
+                </div>
+                <div
+                  className={`step ${item.ui_status === "ready" ? "active" : ""}`}
+                >
+                  <div className="circle">
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <span className="step-text">Ready</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
+        /* 🎯 ถ้าไม่มีข้อมูล จะแสดงแค่กล่องข้อความนี้กล่องเดียวครับ */
+        <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
+          ไม่มีรายการที่กำลังดำเนินการ
         </div>
-      ) ) : (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>ไม่มีรายการที่กำลังดำเนินการ</div>
       )}
 
       {pastBookings.length > 0 && (
         <>
           <div className="section-title past">
-            <RotateCcw size={20} /> ประวัติการจองที่ผ่านมา <div className="line-deco"></div>
+            <RotateCcw size={20} /> ประวัติการจองที่ผ่านมา{" "}
+            <div className="line-deco"></div>
           </div>
-          {pastBookings.map(item => (
+          {pastBookings.map((item) => (
             <div key={item.booking_id} className="past-card">
               <div>
-                <div style={{ fontWeight: 700, fontSize: '15px' }}>
-                  {item.ui_status === 'ready' ? `การล้างรถทำเสร็จ #${item.booking_id}` : `ยกเลิกการจอง #${item.booking_id}`}
+                <div style={{ fontWeight: 700, fontSize: "15px" }}>
+                  {item.ui_status === "ready"
+                    ? `การล้างรถทำเสร็จ #${item.booking_id}`
+                    : `ยกเลิกการจอง #${item.booking_id}`}
                 </div>
-                <div style={{ fontSize: '13px', color: '#888' }}>{formatDate(item.booking_datetime)}</div>
-                <div style={{ fontSize: '13px', marginTop: '5px' }}>
-                   {item.vehicle_brand} ({item.vehicle_plate})
+                <div style={{ fontSize: "13px", color: "#888" }}>
+                  {formatDate(item.booking_datetime)}
+                </div>
+                <div style={{ fontSize: "13px", marginTop: "5px" }}>
+                  {item.vehicle_brand} ({item.vehicle_plate})
                 </div>
               </div>
               <div className={`status-badge ${item.ui_status}`}>
-                {item.ui_status === 'ready' ? 'เสร็จสิ้น' : 'ยกเลิกแล้ว'}
+                {item.ui_status === "ready" ? "เสร็จสิ้น" : "ยกเลิกแล้ว"}
               </div>
             </div>
           ))}
