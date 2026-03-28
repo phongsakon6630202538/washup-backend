@@ -4,11 +4,14 @@ const mongoose = require("mongoose");
 const authMiddleware = require("../middlewares/auth");
 
 // ===============================
-// ✅ CREATE PAYMENT (รับชำระเงิน)
+// ✅ CREATE PAYMENT (รับชำระเงิน + ออกใบเสร็จ)
 // ===============================
 router.post("/", authMiddleware, async (req, res) => {
   const payments = mongoose.connection.collection("payments");
   const bookings = mongoose.connection.collection("bookings");
+
+  // 🎯 ต้องมีบรรทัดนี้ถึงจะบันทึกใบเสร็จได้!
+  const receipts = mongoose.connection.collection("receipts");
 
   try {
     const { booking_id, payment_method } = req.body;
@@ -17,7 +20,6 @@ router.post("/", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "ข้อมูลไม่ครบ" });
     }
 
-    // 🔍 1. หา booking (ดึงเฉพาะ booking_id ไม่ต้องสนว่าใครเป็นคนจอง เพื่อให้ Staff จ่ายแทนได้)
     const booking = await bookings.findOne({
       booking_id: parseInt(booking_id),
     });
@@ -26,35 +28,56 @@ router.post("/", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "ไม่พบ booking" });
     }
 
-    // ❌ 2. กันจ่ายซ้ำ
     if (booking.payment_status === "paid") {
       return res.status(400).json({ message: "ชำระเงินแล้ว" });
     }
 
-    // 🔢 3. รันรหัส payment_id ใหม่
-    const last = await payments
+    // 1. สร้าง payment_id
+    const lastPayment = await payments
       .find()
       .sort({ payment_id: -1 })
       .limit(1)
       .toArray();
-    const payment_id = last.length ? last[0].payment_id + 1 : 8001;
+    const payment_id = lastPayment.length
+      ? lastPayment[0].payment_id + 1
+      : 8001;
 
-    // 💰 4. บันทึกข้อมูลลงตาราง payments
+    // 2. บันทึกลงตาราง payments
     await payments.insertOne({
       payment_id,
       booking_id: parseInt(booking_id),
       total_amount: booking.total_price,
-      payment_method, // cash / transfer / credit
+      payment_method,
       payment_status: "paid",
       paid_at: new Date(),
     });
 
-    // 🔄 5. อัปเดตสถานะในตาราง bookings ว่าจ่ายแล้ว
+    // 3. 🧾 สร้างใบเสร็จลงตาราง receipts
+    const lastReceipt = await receipts
+      .find()
+      .sort({ receipt_id: -1 })
+      .limit(1)
+      .toArray();
+    const receipt_id = lastReceipt.length
+      ? lastReceipt[0].receipt_id + 1
+      : 9001;
+
+    const receipt_number = `RC-${new Date().getFullYear()}-${String(receipt_id - 9000).padStart(4, "0")}`;
+
+    await receipts.insertOne({
+      receipt_id,
+      payment_id,
+      receipt_number,
+      issued_at: new Date(),
+    });
+
+    // 4. 🔄 อัปเดตสถานะใน bookings ว่าจ่ายแล้ว + ทำงานเสร็จแล้ว (คิวจะหายไปจากหน้าจอ)
     await bookings.updateOne(
       { booking_id: parseInt(booking_id) },
       {
         $set: {
           payment_status: "paid",
+          status: "completed",
         },
       },
     );
@@ -62,6 +85,7 @@ router.post("/", authMiddleware, async (req, res) => {
     res.json({
       message: "payment success",
       payment_id,
+      receipt_number,
     });
   } catch (err) {
     res.status(500).json({ message: "payment error" });
@@ -85,7 +109,6 @@ router.get("/:booking_id", authMiddleware, async (req, res) => {
 
     const booking = await bookings.findOne({ booking_id });
 
-    // 🔥 อนุญาตให้เจ้าของรถ หรือ พนักงาน/แอดมิน ดูบิลได้
     if (
       !booking ||
       (booking.user_id !== req.user.user_id &&
