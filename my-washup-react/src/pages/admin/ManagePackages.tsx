@@ -9,7 +9,8 @@ export default function ManagePackages() {
     service_id: "",
     service_name: "",
     description: "",
-    price: 0,
+    price: "",
+    type: "main",
   });
 
   // 1. 🟢 ดึงข้อมูลแพ็คเกจ (ใช้เส้นทาง Admin และส่ง Token)
@@ -40,7 +41,8 @@ export default function ManagePackages() {
       service_id: "",
       service_name: "",
       description: "",
-      price: 0,
+      price: "",
+      type: "main",
     });
     setIsModalOpen(true);
   };
@@ -52,6 +54,7 @@ export default function ManagePackages() {
       service_name: pkg.service_name,
       description: pkg.description,
       price: pkg.price,
+      type: pkg.type || "main",
     });
     setIsModalOpen(true);
   };
@@ -93,7 +96,7 @@ export default function ManagePackages() {
           description: formData.description,
           price: formData.price,
           is_active: true,
-          type: "main",
+          type: formData.type,
         }),
       });
 
@@ -199,10 +202,25 @@ export default function ManagePackages() {
                 type="number"
                 value={formData.price}
                 onChange={(e) =>
-                  setFormData({ ...formData, price: Number(e.target.value) })
+                  setFormData({ ...formData, price: e.target.value })
                 }
               />
             </div>
+
+            {/* 🟢 5. เพิ่มช่องเลือกประเภทบริการตรงนี้ครับ */}
+            <div className="form-group">
+              <label>ประเภทบริการ</label>
+              <select
+                value={formData.type}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
+              >
+                <option value="main">บริการหลัก (Main)</option>
+                <option value="extra">บริการเสริม (Extra)</option>
+              </select>
+            </div>
+
             <div className="modal-actions">
               <button
                 className="btn-cancel"

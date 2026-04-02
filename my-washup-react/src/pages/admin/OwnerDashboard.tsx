@@ -79,7 +79,7 @@ export default function OwnerDashboard() {
               </span>
             </div>
           </div>
-          <div className="stat-card gray-border">
+          {/* <div className="stat-card gray-border">
             <div className="stat-title">Cancelled</div>
             <div className="stat-value">
               {stats.cancelled}{" "}
@@ -87,7 +87,7 @@ export default function OwnerDashboard() {
                 Bookings
               </span>
             </div>
-          </div>
+          </div> */}
           <div className="stat-card yellow-border">
             <div className="stat-title">Popular Package</div>
             <div

@@ -138,8 +138,10 @@
   color: #4a5568;
   font-weight: bold;
 }
+/* ✅ แบบที่ถูกต้อง (แก้ให้ก๊อปไปทับเลยครับ) */
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
   width: 100%;
   padding: 10px;
   border: 1px solid #cbd5e1;
@@ -147,12 +149,14 @@
   font-family: "Kanit", sans-serif;
   box-sizing: border-box;
 }
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
 }
+
 .btn-cancel {
   background: #e2e8f0;
   color: #475569;
@@ -162,6 +166,7 @@
   cursor: pointer;
   font-weight: bold;
 }
+
 .btn-save {
   background: #10b981;
   color: white;

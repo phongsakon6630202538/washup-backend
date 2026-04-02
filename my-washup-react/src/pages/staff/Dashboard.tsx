@@ -517,6 +517,47 @@ export default function StaffDashboard() {
     return `${date.getDate()} ${date.toLocaleString("th-TH", { month: "short" })} - ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")} น.`;
   };
 
+  const handleReject = async (bookingId: number) => {
+    // 1. เด้ง Popup ถามเพื่อความแน่ใจก่อน (กันมือลั่นไปโดน)
+    const isConfirmed = window.confirm("คุณต้องการปฏิเสธคิวนี้ใช่หรือไม่?");
+    if (!isConfirmed) return; // ถ้ากด Cancel ให้หยุดการทำงาน
+    await updateStatus(bookingId, "cancelled");
+
+    try {
+      // 2. ยิง API ไปอัปเดตสถานะใน Database (เปลี่ยน URL ให้ตรงกับ Backend ของตูนด้วยนะ)
+      const response = await fetch(
+        `http://localhost:5000/api/bookings/${bookingId}`,
+        {
+          method: "PATCH", // หรือ PUT (ขึ้นอยู่กับที่ตูนเขียนไว้ใน Backend)
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // ส่งสถานะใหม่ไป อิงตาม Database ตูน (เช่น 'cancelled', 'rejected')
+          body: JSON.stringify({ status: "cancelled" }),
+        },
+      );
+
+      // 3. ตรวจสอบว่า Backend บันทึกสำเร็จไหม
+      if (response.ok) {
+        alert("ปฏิเสธคิวสำเร็จ");
+
+        // 4. อัปเดตหน้าจอให้คิวหายไป (ดึงข้อมูลใหม่โดยไม่ต้องกด F5)
+        setBookings((prevBookings) =>
+          prevBookings.map((b) =>
+            b.booking_id === bookingId ? { ...b, status: "cancelled" } : b,
+          ),
+        );
+
+        // (หรือถ้าแบบข้างบน Error ตูนสามารถใช้ window.location.reload(); แทนได้ครับ ง่ายดี)
+      } else {
+        alert("เกิดข้อผิดพลาด ไม่สามารถปฏิเสธคิวได้");
+      }
+    } catch (error) {
+      console.error("Error rejecting booking:", error);
+      alert("ระบบไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
+    }
+  };
+
   return (
     <>
       <div className="staff-board-bg">
@@ -566,9 +607,14 @@ export default function StaffDashboard() {
                     )}
                   </div>
                   <div className="card-actions">
-                    <button className="btn-sm btn-red">ปฏิเสธ</button>
+                    {/* 🚀 เอาคอมเมนต์ออกแล้วผูก onClick เรียก handleReject */}
+                    <button
+                      className="btn-sm btn-red"
+                      onClick={() => handleReject(job.booking_id)}
+                    >
+                      ปฏิเสธ
+                    </button>
 
-                    {/* 🚀 แก้ตรงนี้ครับ เปลี่ยนจาก updateStatus เป็น setShowConfirmModal เพื่อเปิด Popup */}
                     <button
                       className="btn-sm btn-darknavy"
                       onClick={() => setShowConfirmModal(job)}

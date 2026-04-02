@@ -14,17 +14,18 @@ router.post("/preview", authMiddleware, async (req, res) => {
 
   try {
     const { vehicle_id, main_service, extra_services = [] } = req.body;
-    
 
     if (!vehicle_id || !main_service) {
-      return res.status(400).json({ message: "vehicle_id และ main_service จำเป็น" });
+      return res
+        .status(400)
+        .json({ message: "vehicle_id และ main_service จำเป็น" });
     }
     if (!Array.isArray(extra_services)) {
-    return res.status(400).json({ message: "extra_services ต้องเป็น array" });
+      return res.status(400).json({ message: "extra_services ต้องเป็น array" });
     }
     const vehicle = await vehicles.findOne({
       vehicle_id,
-      user_id: req.user.user_id
+      user_id: req.user.user_id,
     });
 
     if (!vehicle) {
@@ -57,38 +58,40 @@ router.post("/preview", authMiddleware, async (req, res) => {
       serviceList.push({
         service_id: s,
         name: service.service_name,
-        price: service.price
+        price: service.price,
       });
     }
     const vehicle_extra = vehicle.vehicle_type_id !== 1 ? 100 : 0;
 
     res.json({
       services: serviceList,
-      main_service_price: mainServicePrice,   // 🔥 เพิ่ม
+      main_service_price: mainServicePrice, // 🔥 เพิ่ม
       extra_services_price: extraServicesPrice,
       service_total: total,
       vehicle_extra,
-      total_price: total + vehicle_extra
+      total_price: total + vehicle_extra,
     });
-
   } catch (err) {
     res.status(500).json({ message: "preview error" });
   }
 });
 
-
 // ===============================
 // ✅ CREATE BOOKING (หน้า 5 ในไฟล์)
 // ===============================
 router.post("/", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
   const booking_services = mongoose.connection.collection("booking_services");
   const vehicles = mongoose.connection.collection("vehicles");
   const services = mongoose.connection.collection("service");
 
   try {
-    const { vehicle_id, booking_datetime, main_service, extra_services = [] } = req.body;
+    const {
+      vehicle_id,
+      booking_datetime,
+      main_service,
+      extra_services = [],
+    } = req.body;
 
     if (!vehicle_id || !booking_datetime || !main_service) {
       return res.status(400).json({ message: "ข้อมูลไม่ครบ" });
@@ -100,7 +103,7 @@ router.post("/", authMiddleware, async (req, res) => {
 
     const vehicle = await vehicles.findOne({
       vehicle_id,
-      user_id: req.user.user_id
+      user_id: req.user.user_id,
     });
 
     if (!vehicle) {
@@ -114,7 +117,7 @@ router.post("/", authMiddleware, async (req, res) => {
     bookingTime.setSeconds(0, 0);
 
     const count = await bookings.countDocuments({
-      booking_datetime: bookingTime
+      booking_datetime: bookingTime,
     });
 
     if (count >= MAX_PER_SLOT) {
@@ -124,7 +127,11 @@ router.post("/", authMiddleware, async (req, res) => {
     // ===============================
     // 🔥 GENERATE booking_id
     // ===============================
-    const last = await bookings.find().sort({ booking_id: -1 }).limit(1).toArray();
+    const last = await bookings
+      .find()
+      .sort({ booking_id: -1 })
+      .limit(1)
+      .toArray();
     const booking_id = last.length ? last[0].booking_id + 1 : 4001;
 
     let total = 0;
@@ -134,7 +141,7 @@ router.post("/", authMiddleware, async (req, res) => {
       const service = await services.findOne({ service_id: s });
 
       if (!service) {
-        return res.status(404).json({ message: "ไม่พบบริการ" });
+        return res.status(404).json({ message: "ไม่พบบริาการที่คุณเลือก" });
       }
 
       total += service.price;
@@ -143,8 +150,7 @@ router.post("/", authMiddleware, async (req, res) => {
         booking_service_id: new mongoose.Types.ObjectId(),
         booking_id,
         service_id: s,
-        price_at_booking: service.price
-
+        price_at_booking: service.price,
       });
     }
 
@@ -165,167 +171,160 @@ router.post("/", authMiddleware, async (req, res) => {
       created_at: new Date(),
 
       checkin_note: null, // 🔥 เพิ่มบรรทัดนี้
-      staff_note: ""             // 🔥 เพิ่มบรรทัดนี้
-
+      staff_note: "", // 🔥 เพิ่มบรรทัดนี้
     });
 
     res.json({
       message: "booking created",
       booking_id,
       total_price,
-      refresh_slots: true
+      refresh_slots: true,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "create booking error" });
   }
 });
 
-
 // ===============================
 // ✅ GET MY BOOKINGS (FULL JOIN สำหรับหน้า "ประวัติ")
 // ===============================
 router.get("/user", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
 
   try {
-    
-    const result = await bookings.aggregate([
+    const result = await bookings
+      .aggregate([
+        // 🔹 เฉพาะของ user คนนี้
+        {
+          $match: {
+            user_id: req.user.user_id,
+          },
+        },
 
-      // 🔹 เฉพาะของ user คนนี้
-      {
-        $match: {
-          user_id: req.user.user_id
-        }
-      },
+        // =========================
+        // 🔗 JOIN VEHICLE
+        // =========================
+        {
+          $lookup: {
+            from: "vehicles",
+            localField: "vehicle_id",
+            foreignField: "vehicle_id",
+            as: "vehicle",
+          },
+        },
+        { $unwind: "$vehicle" },
 
-      // =========================
-      // 🔗 JOIN VEHICLE
-      // =========================
-      {
-        $lookup: {
-          from: "vehicles",
-          localField: "vehicle_id",
-          foreignField: "vehicle_id",
-          as: "vehicle"
-        }
-      },
-      { $unwind: "$vehicle" },
+        // =========================
+        // 🔗 JOIN BOOKING SERVICES
+        // =========================
+        {
+          $lookup: {
+            from: "booking_services",
+            localField: "booking_id",
+            foreignField: "booking_id",
+            as: "booking_services",
+          },
+        },
 
-      // =========================
-      // 🔗 JOIN BOOKING SERVICES
-      // =========================
-      {
-        $lookup: {
-          from: "booking_services",
-          localField: "booking_id",
-          foreignField: "booking_id",
-          as: "booking_services"
-        }
-      },
+        // =========================
+        // 🔗 JOIN SERVICE
+        // =========================
+        {
+          $lookup: {
+            from: "service",
+            localField: "booking_services.service_id",
+            foreignField: "service_id",
+            as: "service_detail",
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "user_id",
+            foreignField: "user_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
 
-      // =========================
-      // 🔗 JOIN SERVICE
-      // =========================
-      {
-        $lookup: {
-          from: "service",
-          localField: "booking_services.service_id",
-          foreignField: "service_id",
-          as: "service_detail"
-        }
-      },
-      {
-       $lookup: {
-       from: "users",
-       localField: "user_id",
-       foreignField: "user_id",
-       as: "user"
-        }
-      },
-      { $unwind: "$user" },
+        // =========================
+        // 🧠 FORMAT OUTPUT
+        // =========================
+        {
+          $project: {
+            _id: 0,
 
-      // =========================
-      // 🧠 FORMAT OUTPUT
-      // =========================
-      {
-        $project: {
-          _id: 0,
+            booking_id: 1,
+            status: 1,
+            payment_status: 1,
+            booking_datetime: 1,
+            total_price: 1,
+            checkin_note: 1,
+            staff_note: 1,
+            started_at: 1,
+            finished_at: 1,
+            // 👤 USER ✅ (เพิ่มตรงนี้)
+            username: "$user.login_name",
 
-          booking_id: 1,
-          status: 1,
-          payment_status: 1,
-          booking_datetime: 1,
-          total_price: 1,
-          checkin_note: 1,
-          staff_note: 1,
-          started_at: 1,
-          finished_at: 1,
-          // 👤 USER ✅ (เพิ่มตรงนี้)
-          username: "$user.login_name",
+            // 🚗 VEHICLE
+            vehicle_plate: "$vehicle.license_plate",
+            vehicle_brand: "$vehicle.brand",
+            vehicle_model: "$vehicle.model",
 
-          // 🚗 VEHICLE
-          vehicle_plate: "$vehicle.license_plate",
-          vehicle_brand: "$vehicle.brand",
-          vehicle_model: "$vehicle.model",
+            // 🧽 SERVICES
+            services: {
+              $map: {
+                input: "$service_detail",
+                as: "s",
+                in: "$$s.service_name",
+              },
+            },
+          },
+        },
 
-          // 🧽 SERVICES
-          services: {
-            $map: {
-              input: "$service_detail",
-              as: "s",
-              in: "$$s.service_name"
-            }
-          }
-        }
-      },
-
-      // 🔽 เรียงล่าสุดก่อน
-      {
-        $sort: { booking_datetime: -1 }
-      }
-
-    ]).toArray();
-     // 🔥 map status ให้ตรง UI
+        // 🔽 เรียงล่าสุดก่อน
+        {
+          $sort: { booking_datetime: -1 },
+        },
+      ])
+      .toArray();
+    // 🔥 map status ให้ตรง UI
     const mapStatus = (status) => {
       switch (status) {
-        case "pending": return "Pending";
-        case "confirmed": return "Confirmed";
-        case "washing": return "In Progress";
-        case "completed": return "Ready";
-        default: return status;
+        case "pending":
+          return "Pending";
+        case "confirmed":
+          return "Confirmed";
+        case "washing":
+          return "In Progress";
+        case "completed":
+          return "Ready";
+        default:
+          return status;
       }
     };
 
     // 🔥 เพิ่ม ui_status
-    const formatted = result.map(b => ({
+    const formatted = result.map((b) => ({
       ...b,
-      ui_status: mapStatus(b.status)
+      ui_status: mapStatus(b.status),
     }));
 
     res.json(formatted);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "fetch bookings error" });
   }
 });
 
-
-
-
-
 // ===============================
 // ✅ UPDATE STATUS (staff/admin) หน้า “การ์ดงาน + ปุ่มจัดการ”
 // ===============================
 router.put("/:id", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
 
   try {
-
     if (req.user.user_role !== "admin" && req.user.user_role !== "staff") {
       return res.status(403).json({ message: "forbidden" });
     }
@@ -334,55 +333,57 @@ router.put("/:id", authMiddleware, async (req, res) => {
     const { status, checkin_note, staff_note } = req.body;
 
     // ✅ VALIDATION
-    const allowedStatus = ["pending", "confirmed", "washing", "completed", "cancelled"];
+    const allowedStatus = [
+      "pending",
+      "confirmed",
+      "washing",
+      "completed",
+      "cancelled",
+    ];
 
     if (!allowedStatus.includes(status)) {
       return res.status(400).json({ message: "invalid status" });
     }
 
-      const update = {
-        status,
-        updated_at: new Date(),
+    const update = {
+      status,
+      updated_at: new Date(),
 
-        ...(checkin_note !== undefined && { checkin_note }),
-        ...(staff_note !== undefined && { staff_note })
-      };
+      ...(checkin_note !== undefined && { checkin_note }),
+      ...(staff_note !== undefined && { staff_note }),
+    };
 
-      // 🔥 เพิ่ม 2 อันนี้
-      if (status === "washing") {
-        update.started_at = new Date();
-      }
+    // 🔥 เพิ่ม 2 อันนี้
+    if (status === "washing") {
+      update.started_at = new Date();
+    }
 
-      if (status === "completed") {
-        update.finished_at = new Date();
-      }
+    if (status === "completed") {
+      update.finished_at = new Date();
+    }
 
-      const result = await bookings.updateOne(
-        { booking_id: bookingId },
-        { $set: update }
-      );
+    const result = await bookings.updateOne(
+      { booking_id: bookingId },
+      { $set: update },
+    );
 
-      if (result.matchedCount === 0) {
-        return res.status(404).json({ message: "ไม่พบ booking" });
-      }
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "ไม่พบ booking" });
+    }
 
     res.json({ message: "updated", status });
-
   } catch (err) {
     res.status(500).json({ message: "update error" });
   }
 });
 
-
 // ===============================
 // ✅ GET ALL BOOKINGS (FULL JOIN) กระดานคิวงาน (Staff Dashboard)
 // ===============================
 router.get("/", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
 
   try {
-
     // 🔒 เฉพาะ staff / admin
     if (req.user.user_role !== "staff" && req.user.user_role !== "admin") {
       return res.status(403).json({ message: "ไม่มีสิทธิ์" });
@@ -393,115 +394,114 @@ router.get("/", authMiddleware, async (req, res) => {
 
     if (date) {
       const start = new Date(date);
-      start.setHours(0,0,0,0);
+      start.setHours(0, 0, 0, 0);
 
       const end = new Date(date);
-      end.setHours(23,59,59,999);
+      end.setHours(23, 59, 59, 999);
 
       matchStage.booking_datetime = { $gte: start, $lte: end };
     }
 
-    const result = await bookings.aggregate([
-      {
-      $match: matchStage // ✅ ใส่ตรงนี้ "ตัวแรกสุด"
-      },
+    const result = await bookings
+      .aggregate([
+        {
+          $match: matchStage, // ✅ ใส่ตรงนี้ "ตัวแรกสุด"
+        },
 
+        // =========================
+        // 🔗 JOIN VEHICLE
+        // =========================
+        {
+          $lookup: {
+            from: "vehicles",
+            localField: "vehicle_id",
+            foreignField: "vehicle_id",
+            as: "vehicle",
+          },
+        },
+        { $unwind: "$vehicle" },
 
-      // =========================
-      // 🔗 JOIN VEHICLE
-      // =========================
-      {
-        $lookup: {
-          from: "vehicles",
-          localField: "vehicle_id",
-          foreignField: "vehicle_id",
-          as: "vehicle"
-        }
-      },
-      { $unwind: "$vehicle" },
+        // =========================
+        // 🔗 JOIN USER
+        // =========================
+        {
+          $lookup: {
+            from: "users",
+            localField: "user_id",
+            foreignField: "user_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
 
-      // =========================
-      // 🔗 JOIN USER
-      // =========================
-      {
-        $lookup: {
-          from: "users",
-          localField: "user_id",
-          foreignField: "user_id",
-          as: "user"
-        }
-      },
-      { $unwind: "$user" },
+        // =========================
+        // 🔗 JOIN BOOKING SERVICES
+        // =========================
+        {
+          $lookup: {
+            from: "booking_services",
+            localField: "booking_id",
+            foreignField: "booking_id",
+            as: "booking_services",
+          },
+        },
 
-      // =========================
-      // 🔗 JOIN BOOKING SERVICES
-      // =========================
-      {
-        $lookup: {
-          from: "booking_services",
-          localField: "booking_id",
-          foreignField: "booking_id",
-          as: "booking_services"
-        }
-      },
+        // =========================
+        // 🔗 JOIN SERVICE
+        // =========================
+        {
+          $lookup: {
+            from: "service",
+            localField: "booking_services.service_id",
+            foreignField: "service_id",
+            as: "service_detail",
+          },
+        },
 
-      // =========================
-      // 🔗 JOIN SERVICE
-      // =========================
-      {
-        $lookup: {
-          from: "service",
-          localField: "booking_services.service_id",
-          foreignField: "service_id",
-          as: "service_detail"
-        }
-      },
+        // =========================
+        // 🧠 FORMAT OUTPUT
+        // =========================
+        {
+          $project: {
+            _id: 0,
 
-      // =========================
-      // 🧠 FORMAT OUTPUT
-      // =========================
-    {
-      $project: {
-      _id: 0,
+            booking_id: 1,
+            status: 1,
+            payment_status: 1,
+            booking_datetime: 1,
+            total_price: 1,
+            checkin_note: 1,
+            staff_note: 1,
 
-      booking_id: 1,
-      status: 1,
-      payment_status: 1,
-      booking_datetime: 1,
-      total_price: 1,
-      checkin_note: 1,
-      staff_note: 1,
+            // 👤 USER
+            username: "$user.login_name",
 
-      // 👤 USER
-      username: "$user.login_name",
+            // 🚗 VEHICLE
+            vehicle_plate: "$vehicle.license_plate",
+            vehicle_brand: "$vehicle.brand",
+            vehicle_model: "$vehicle.model",
 
-      // 🚗 VEHICLE
-      vehicle_plate: "$vehicle.license_plate",
-      vehicle_brand: "$vehicle.brand",
-      vehicle_model: "$vehicle.model",
+            // 🧽 SERVICES
+            services: {
+              $map: {
+                input: "$service_detail",
+                as: "s",
+                in: "$$s.service_name",
+              },
+            },
+          },
+        },
 
-      // 🧽 SERVICES
-      services: {
-        $map: {
-          input: "$service_detail",
-          as: "s",
-          in: "$$s.service_name"
-          }
-        }
-      }
-    },
-
-      // =========================
-      // 🔽 SORT
-      // =========================
-      {
-        $sort: { booking_datetime: 1 }
-      }
-
-    ]).toArray();
+        // =========================
+        // 🔽 SORT
+        // =========================
+        {
+          $sort: { booking_datetime: 1 },
+        },
+      ])
+      .toArray();
 
     res.json(result);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "fetch all bookings error" });
@@ -511,7 +511,6 @@ router.get("/", authMiddleware, async (req, res) => {
 // ✅ CANCEL BOOKING (customer)
 // ===============================
 router.put("/:id/cancel", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
 
   try {
@@ -536,13 +535,12 @@ router.put("/:id/cancel", authMiddleware, async (req, res) => {
       {
         $set: {
           status: "cancelled",
-          updated_at: new Date()
-        }
-      }
+          updated_at: new Date(),
+        },
+      },
     );
 
     res.json({ message: "cancel success" });
-
   } catch (err) {
     res.status(500).json({ message: "cancel error" });
   }
@@ -561,27 +559,37 @@ router.get("/slots", authMiddleware, async (req, res) => {
     }
 
     // เวลาตาม UI
-    const TIMES = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00"];
+    const TIMES = [
+      "09:00",
+      "10:30",
+      "12:00",
+      "13:30",
+      "15:00",
+      "16:30",
+      "18:00",
+    ];
 
     // ✅ ใช้เวลาไทย
     const start = new Date(`${date}T00:00:00+07:00`);
     const end = new Date(`${date}T23:59:59+07:00`);
 
-    const dayBookings = await bookings.find({
-      booking_datetime: { $gte: start, $lte: end }
-    }).toArray();
+    const dayBookings = await bookings
+      .find({
+        booking_datetime: { $gte: start, $lte: end },
+      })
+      .toArray();
 
     // ✅ นับจำนวนแต่ละ slot (แบบเร็ว + ไม่เพี้ยน)
     const slotCount = {};
 
-    dayBookings.forEach(b => {
+    dayBookings.forEach((b) => {
       const d = new Date(b.booking_datetime);
 
       const thaiTime = d.toLocaleString("en-GB", {
         timeZone: "Asia/Bangkok",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: false
+        hour12: false,
       });
 
       if (!slotCount[thaiTime]) {
@@ -592,14 +600,13 @@ router.get("/slots", authMiddleware, async (req, res) => {
     });
 
     // ✅ สร้าง result สำหรับ frontend
-    const result = TIMES.map(time => ({
+    const result = TIMES.map((time) => ({
       time,
       count: slotCount[time] || 0,
-      max: MAX_PER_SLOT
+      max: MAX_PER_SLOT,
     }));
 
     res.json(result);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "slot error" });
@@ -607,7 +614,6 @@ router.get("/slots", authMiddleware, async (req, res) => {
 });
 
 router.get("/:id", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
   const vehicles = mongoose.connection.collection("vehicles");
   const users = mongoose.connection.collection("users");
@@ -626,18 +632,20 @@ router.get("/:id", authMiddleware, async (req, res) => {
     const vehicle = await vehicles.findOne({ vehicle_id: booking.vehicle_id });
     const user = await users.findOne({ user_id: booking.user_id });
 
-    const serviceData = await bookingServices.aggregate([
-      { $match: { booking_id: bookingId } },
-      {
-        $lookup: {
-          from: "service",
-          localField: "service_id",
-          foreignField: "service_id",
-          as: "service"
-        }
-      },
-      { $unwind: "$service" }
-    ]).toArray();
+    const serviceData = await bookingServices
+      .aggregate([
+        { $match: { booking_id: bookingId } },
+        {
+          $lookup: {
+            from: "service",
+            localField: "service_id",
+            foreignField: "service_id",
+            as: "service",
+          },
+        },
+        { $unwind: "$service" },
+      ])
+      .toArray();
 
     res.json({
       booking_id: booking.booking_id,
@@ -656,18 +664,16 @@ router.get("/:id", authMiddleware, async (req, res) => {
       vehicle: {
         plate: vehicle?.license_plate,
         brand: vehicle?.brand,
-        model: vehicle?.model
+        model: vehicle?.model,
       },
 
-      services: serviceData.map(s => s.service.service_name)
+      services: serviceData.map((s) => s.service.service_name),
     });
-
   } catch (err) {
     res.status(500).json({ message: "fetch booking error" });
   }
 });
 router.put("/:id/finish", authMiddleware, async (req, res) => {
-
   const bookings = mongoose.connection.collection("bookings");
 
   try {
@@ -683,13 +689,12 @@ router.put("/:id/finish", authMiddleware, async (req, res) => {
         $set: {
           status: "completed",
           finished_at: new Date(),
-          updated_at: new Date()
-        }
-      }
+          updated_at: new Date(),
+        },
+      },
     );
 
     res.json({ message: "job finished" });
-
   } catch (err) {
     res.status(500).json({ message: "finish error" });
   }
